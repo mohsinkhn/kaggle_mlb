@@ -7,6 +7,7 @@ import cupy as cp
 import numpy as np
 from pathlib import Path
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.preprocessing import OrdinalEncoder
 
 
 def _convert_to_2d_array(X):
@@ -197,3 +198,22 @@ class LastNMedian(TimeSeriesTransformer):
 
     def _reduce_func(self, arr):
         return cp.median(arr[-self.N:], 0)
+
+
+class OrdinalTransformer(BaseTransformer):
+    """Encode some of the columns from dataframe as ordinal values."""
+    def __init__(self, cols):
+        self.cols = cols
+        self.enc = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
+
+    def fit(self, X, y=None):
+        self.enc.fit(X[self.cols])
+        return self
+
+    def transform(self, X, y=None):
+        Xord = self.enc.transform(X[self.cols])
+        other_cols = [col for col in X.columns if col not in self.cols]
+        df = X[other_cols]
+        for i, col in enumerate(self.cols):
+            df[col] = Xord[:, i]
+        return df
