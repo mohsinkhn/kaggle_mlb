@@ -1,37 +1,40 @@
+import joblib
+
 import pandas as pd
 from pathlib import Path
-from sklearn.pipeline import make_pipeline
+from sklearn.pipeline import make_pipeline, make_union
 
 from mllib.transformers import OrdinalTransformer
-from src.utils.io import load_json
-from src.constants import root_path, playerid_mapping_file
+from src.constants import root_path, playerid_mapping_file, VAL_START_DATE
 from src.pipelines.data_preparation import ParsePlayerData, CreateUpdateArtifact
 
 
 if __name__ == "__main__":
     filepath = str(Path(root_path) / playerid_mapping_file)
-    playerid_mappings = load_json(filepath)
-
     raw_data = pd.read_csv(Path(root_path) / "train.csv")
+    tr_data = raw_data.loc[raw_data["date"] < VAL_START_DATE]
     pipe1 = make_pipeline(
         ParsePlayerData("nextDayPlayerEngagement", ["date", "target1", "target2", "target3", "target4"]),
-        CreateUpdateArtifact("./data", None, "tr_targets", playerid_mappings, True),
+        CreateUpdateArtifact("./data", None, "tr_targets", filepath, True),
     )
-    pipe1.transform(raw_data)
+    pipe1.fit_transform(tr_data)
+    joblib.dump(pipe1, 'data/pipeline_dataprep_pipe1.pkl')
 
     pipe2 = make_pipeline(
         ParsePlayerData("rosters", ["date", "teamId", "statusCode"]),
         OrdinalTransformer(["statusCode"]),
-        CreateUpdateArtifact("./data", None, "tr_rosters", playerid_mappings, True),
+        CreateUpdateArtifact("./data", None, "tr_rosters", filepath, True),
     )
-    pipe2.transform(raw_data)
+    pipe2.fit_transform(raw_data)
+    joblib.dump(pipe2, 'data/pipeline_dataprep_pipe2.pkl')
 
     pipe3 = make_pipeline(
         ParsePlayerData("awards", ["date", "awardId"]),
         OrdinalTransformer(["awardId"]),
-        CreateUpdateArtifact("./data", None, "tr_awards", playerid_mappings, True),
+        CreateUpdateArtifact("./data", None, "tr_awards", filepath, True),
     )
-    pipe3.transform(raw_data)
+    pipe3.fit_transform(raw_data)
+    joblib.dump(pipe3, 'data/pipeline_dataprep_pipe3.pkl')
 
     pipe4 = make_pipeline(
         ParsePlayerData(
@@ -116,20 +119,23 @@ if __name__ == "__main__":
                 "chances",
             ],
         ),
-        OrdinalTransformer(["positionCode", "positionType"]),
-        CreateUpdateArtifact("./data", None, "tr_awards", playerid_mappings, True),
+        OrdinalTransformer(["jerseyNum", "positionCode", "positionType"]),
+        CreateUpdateArtifact("./data", None, "tr_scores", filepath, True),
     )
-    pipe4.transform(raw_data)
+    pipe4.fit_transform(raw_data)
+    joblib.dump(pipe4, 'data/pipeline_dataprep_pipe4.pkl')
 
     pipe5 = make_pipeline(
         ParsePlayerData("playerTwitterFollowers", ["date", "numberOfFollowers"]),
-        CreateUpdateArtifact("./data", None, "tr_twitter", playerid_mappings, True),
+        CreateUpdateArtifact("./data", None, "tr_twitter", filepath, True),
     )
-    pipe5.transform(raw_data)
+    pipe5.fit_transform(raw_data)
+    joblib.dump(pipe5, 'data/pipeline_dataprep_pipe5.pkl')
 
     pipe6 = make_pipeline(
         ParsePlayerData("transactions", ["date", "typeCode"]),
         OrdinalTransformer(["typeCode"]),
-        CreateUpdateArtifact("./data", None, "tr_transactions", playerid_mappings, True),
+        CreateUpdateArtifact("./data", None, "tr_transactions", filepath, True),
     )
-    pipe6.transform(raw_data)
+    pipe6.fit_transform(raw_data)
+    joblib.dump(pipe6, 'data/pipeline_dataprep_pipe6.pkl')

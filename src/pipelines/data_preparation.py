@@ -22,11 +22,12 @@ class ParsePlayerData(BaseTransformer):
         for _, row in tqdm(X.iterrows(), total=len(X)):
             data = row[self.field_name]
             date = row['date']
-            if data == 'nan':
+            if (str(data) == 'nan'):
                 continue
                 # return None
             df = pd.read_json(data)
             df['playerId'] = df['playerId'].astype(str)
+            df.drop_duplicates(subset=['playerId'], inplace=True)
             df.set_index('playerId', inplace=True)
             df['date'] = date
             dfs.append(df[self.use_cols])
@@ -34,7 +35,7 @@ class ParsePlayerData(BaseTransformer):
 
 
 class CreateUpdateArtifact(BaseTransformer):
-    def __init__(self, root_path, load_artifact, save_artifact, player_mappings, renew=True):
+    def __init__(self, root_path, load_artifact, save_artifact, playerid_mappings_file, renew=True):
         self.root_path = root_path
         self.renew = renew
         self.load_artifact = load_artifact
@@ -45,18 +46,20 @@ class CreateUpdateArtifact(BaseTransformer):
         self.save_artifact = save_artifact
         self.artifact_save_path = Path(root_path) / self.save_artifact
         if self.renew:
-            self.artifact_save_path.rmdir()
+            if self.artifact_save_path.exists():
+                shutil.rmtree(self.artifact_save_path)
         self.artifact_save_path.mkdir(parents=True, exist_ok=True)
-        self.playerid_mappings = player_mappings
+        self.playerid_mappings_file = playerid_mappings_file
 
     def fit(self, X, y=None):
         return self
 
     def transform(self, X, y=None):
+        playerid_mappings = load_json(self.playerid_mappings_file)
         df = X.copy()
-        mapping_df = pd.DataFrame.from_dict(self.playerid_mappings, orient='index', columns=['playeridx'])
+        mapping_df = pd.DataFrame.from_dict(playerid_mappings, orient='index', columns=['playeridx'])
 
-        if (self.artifact_load_path / 'data.npy').exists():
+        if (self.artifact_load_path is not None) and (self.artifact_load_path / 'data.npy').exists():
             prev_arr, date_mapping = self._load()
         else:
             prev_arr, date_mapping = None, {}
@@ -66,15 +69,16 @@ class CreateUpdateArtifact(BaseTransformer):
             tmp = df.loc[df.date == date]
             arr = pd.merge(mapping_df, tmp, left_index=True, right_index=True, how='left')
             del arr['date'], arr['playeridx']
-            arr = np.expand_dims(arr.values, 0)
+            arr = np.expand_dims(arr.values, 0).astype(np.float32)
             if prev_arr is None:
                 prev_arr = arr
-            else:    
-                prev_arr = np.append(prev_arr, arr, 0)
-            if not date_mapping:
                 date_mapping[str(date)] = 0
             else:
-                date_mapping[str(date)] = max(date_mapping.values()) + i
+                if str(date) in date_mapping:
+                    prev_arr[date_mapping[str(date)]] = arr
+                else:
+                    prev_arr = np.append(prev_arr, arr, 0)
+                    date_mapping[str(date)] = max(date_mapping.values()) + 1
 
         self._save(prev_arr, date_mapping)
 
