@@ -90,12 +90,15 @@ class TimeSeriesTransformer(ArrayTransformer):
         dates = X[self.date_col].unique()
         date_to_idx = {}
         results = []
+        idx = 0
         for i, date in enumerate(dates):
             date = str(date)
             if date > max_date:
                 idx = tdim
             else:
-                idx = date_mapping[date]
+                if date in date_mapping:
+                    idx = date_mapping[date]
+
             agg = self.agg_date_data(data, idx, udim, cdim)
             results.append(agg)
             date_to_idx[date] = i
