@@ -2,7 +2,7 @@ import joblib
 
 import pandas as pd
 from pathlib import Path
-from sklearn.pipeline import make_pipeline, make_union
+from sklearn.pipeline import make_pipeline
 
 from mllib.transformers import OrdinalTransformer
 from src.constants import root_path, playerid_mapping_file, VAL_START_DATE
@@ -22,7 +22,7 @@ if __name__ == "__main__":
 
     pipe2 = make_pipeline(
         ParsePlayerData("rosters", ["date", "teamId", "statusCode"]),
-        OrdinalTransformer(["statusCode"]),
+        OrdinalTransformer(["statusCode", "teamId"]),
         CreateUpdateArtifact("./data", None, "tr_rosters", filepath, True),
     )
     pipe2.fit_transform(raw_data)

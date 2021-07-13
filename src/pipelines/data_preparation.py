@@ -22,7 +22,7 @@ class ParsePlayerData(BaseTransformer):
         for _, row in tqdm(X.iterrows(), total=len(X)):
             data = row[self.field_name]
             date = row['date']
-            if (str(data) == 'nan'):
+            if (str(data) == 'nan') or (str(data) == '') or (str(data) == 'NaN'):
                 continue
                 # return None
             df = pd.read_json(data)
@@ -90,4 +90,3 @@ class CreateUpdateArtifact(BaseTransformer):
     def _save(self, arr, date_mapping):
         np.save(str(self.artifact_save_path / 'data.npy'), arr)
         save_json(date_mapping, str(self.artifact_save_path / 'date_mapping.json'))
-

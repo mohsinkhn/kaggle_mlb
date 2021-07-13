@@ -85,12 +85,12 @@ class TimeSeriesTransformer(ArrayTransformer):
         data, date_mapping = self._load_historical_data(self.hist_data_path)
         data = cp.array(data)
         tdim, udim, cdim = *data.shape[:2], len(self.key_cols)
-        max_date = max(date_mapping.keys())
         # loop over dates and aggregate data for each date
         dates = X[self.date_col].unique()
         date_to_idx = {}
         results = []
         idx = 0
+        max_date = max(date_mapping.keys())
         for i, date in enumerate(dates):
             date = str(date)
             if date > max_date:
@@ -227,10 +227,10 @@ class OrdinalTransformer(BaseTransformer):
 
 
 class DateTimeFeatures(ArrayTransformer):
-    def __init__(self, attrs=['dayofweek', 'dayofmonth'], format='%Y%m%d'):
+    def __init__(self, attrs=['dayofweek', 'day'], format='%Y%m%d'):
         self.attrs = attrs
         self.format = format
-    
+
     def _transform(self, X, y=None):
         X = pd.to_datetime(X, format=self.format)
         Xt = []
