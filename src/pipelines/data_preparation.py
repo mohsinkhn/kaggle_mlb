@@ -10,7 +10,7 @@ from src.utils.io import load_json, save_json
 
 
 class ParsePlayerData(BaseTransformer):
-    def __init__(self, field_name, use_cols, agg=False):
+    def __init__(self, field_name, use_cols, agg=None):
         self.field_name = field_name
         self.use_cols = use_cols
         self.agg = agg
@@ -22,25 +22,41 @@ class ParsePlayerData(BaseTransformer):
         dfs = []
         for _, row in tqdm(X.iterrows(), total=len(X)):
             data = row[self.field_name]
-            date = row['date']
-            if (str(data) == 'nan') or (str(data) == '') or (str(data) == 'NaN') or (str(data) == 'null') or (str(data) == '<NA>'):
+            if (
+                (str(data) == "nan")
+                or (str(data) == "")
+                or (str(data) == "NaN")
+                or (str(data) == "null")
+                or (str(data) == "<NA>")
+            ):
                 continue
                 # return None
-            df = pd.read_json(data)
-            df['playerId'] = df['playerId'].astype(str)
-            if self.agg:
-                df = df.groupby('playerId')[self.use_cols].sum()
-            else:
-                df.drop_duplicates(subset=['playerId'], inplace=True)
-                df.set_index('playerId', inplace=True)
-                df = df[self.use_cols]
-            df['date'] = date
-            dfs.append(df)
+            date = row["date"]
+            try:
+                df = pd.read_json(data)
+                df["playerId"] = df["playerId"].astype(str)
+                if self.agg is not None:
+                    df = getattr(df.groupby("playerId")[self.use_cols], self.agg)()
+                else:
+                    df.drop_duplicates(subset=["playerId"], inplace=True)
+                    df.set_index("playerId", inplace=True)
+                    df = df[self.use_cols]
+                df["date"] = date
+                dfs.append(df)
+            except:
+                continue
         return pd.concat(dfs)
 
 
 class CreateUpdateArtifact(BaseTransformer):
-    def __init__(self, root_path, load_artifact, save_artifact, playerid_mappings_file, renew=True):
+    def __init__(
+        self,
+        root_path,
+        load_artifact,
+        save_artifact,
+        playerid_mappings_file,
+        renew=True,
+    ):
         self.root_path = root_path
         self.renew = renew
         self.load_artifact = load_artifact
@@ -62,9 +78,13 @@ class CreateUpdateArtifact(BaseTransformer):
     def transform(self, X, y=None):
         playerid_mappings = load_json(self.playerid_mappings_file)
         df = X.copy()
-        mapping_df = pd.DataFrame.from_dict(playerid_mappings, orient='index', columns=['playeridx'])
+        mapping_df = pd.DataFrame.from_dict(
+            playerid_mappings, orient="index", columns=["playeridx"]
+        )
 
-        if (self.artifact_load_path is not None) and (self.artifact_load_path / 'data.npy').exists():
+        if (self.artifact_load_path is not None) and (
+            self.artifact_load_path / "data.npy"
+        ).exists():
             prev_arr, date_mapping = self._load()
         else:
             prev_arr, date_mapping = None, {}
@@ -72,8 +92,8 @@ class CreateUpdateArtifact(BaseTransformer):
         dates = df.date.unique()
         for i, date in tqdm(enumerate(dates), total=len(dates)):
             tmp = df.loc[df.date == date]
-            arr = pd.merge(mapping_df, tmp, left_index=True, right_index=True, how='left')
-            del arr['date'], arr['playeridx']
+            arr = pd.merge(mapping_df, tmp, left_index=True, right_index=True, how="left")
+            del arr["date"], arr["playeridx"]
             arr = np.expand_dims(arr.values, 0).astype(np.float32)
             if prev_arr is None:
                 prev_arr = arr
@@ -88,10 +108,10 @@ class CreateUpdateArtifact(BaseTransformer):
         self._save(prev_arr, date_mapping)
 
     def _load(self):
-        prev_arr = np.load(str(self.artifact_load_path / 'data.npy'), allow_pickle=True)
-        date_mapping = load_json(str(self.artifact_load_path / 'date_mapping.json'))
+        prev_arr = np.load(str(self.artifact_load_path / "data.npy"), allow_pickle=True)
+        date_mapping = load_json(str(self.artifact_load_path / "date_mapping.json"))
         return prev_arr, date_mapping
 
     def _save(self, arr, date_mapping):
-        np.save(str(self.artifact_save_path / 'data.npy'), arr)
-        save_json(date_mapping, str(self.artifact_save_path / 'date_mapping.json'))
+        np.save(str(self.artifact_save_path / "data.npy"), arr)
+        save_json(date_mapping, str(self.artifact_save_path / "date_mapping.json"))
