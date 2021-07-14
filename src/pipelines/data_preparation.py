@@ -90,20 +90,23 @@ class CreateUpdateArtifact(BaseTransformer):
             prev_arr, date_mapping = None, {}
 
         dates = df.date.unique()
-        for i, date in tqdm(enumerate(dates), total=len(dates)):
-            tmp = df.loc[df.date == date]
-            arr = pd.merge(mapping_df, tmp, left_index=True, right_index=True, how="left")
-            del arr["date"], arr["playeridx"]
-            arr = np.expand_dims(arr.values, 0).astype(np.float32)
-            if prev_arr is None:
-                prev_arr = arr
-                date_mapping[str(date)] = 0
-            else:
-                if str(date) in date_mapping:
-                    prev_arr[date_mapping[str(date)]] = arr
+        try:
+            for i, date in tqdm(enumerate(dates), total=len(dates)):
+                tmp = df.loc[df.date == date]
+                arr = pd.merge(mapping_df, tmp, left_index=True, right_index=True, how="left")
+                del arr["date"], arr["playeridx"]
+                arr = np.expand_dims(arr.values, 0).astype(np.float32)
+                if prev_arr is None:
+                    prev_arr = arr
+                    date_mapping[str(date)] = 0
                 else:
-                    prev_arr = np.append(prev_arr, arr, 0)
-                    date_mapping[str(date)] = max(date_mapping.values()) + 1
+                    if str(date) in date_mapping:
+                        prev_arr[date_mapping[str(date)]] = arr
+                    else:
+                        prev_arr = np.append(prev_arr, arr, 0)
+                        date_mapping[str(date)] = max(date_mapping.values()) + 1
+        except:
+            pass
 
         self._save(prev_arr, date_mapping)
 
