@@ -10,9 +10,10 @@ from src.utils.io import load_json, save_json
 
 
 class ParsePlayerData(BaseTransformer):
-    def __init__(self, field_name, use_cols):
+    def __init__(self, field_name, use_cols, agg=False):
         self.field_name = field_name
         self.use_cols = use_cols
+        self.agg = agg
 
     def fit(self, X, y=None):
         return self
@@ -22,15 +23,19 @@ class ParsePlayerData(BaseTransformer):
         for _, row in tqdm(X.iterrows(), total=len(X)):
             data = row[self.field_name]
             date = row['date']
-            if (str(data) == 'nan') or (str(data) == '') or (str(data) == 'NaN'):
+            if (str(data) == 'nan') or (str(data) == '') or (str(data) == 'NaN') or (str(data) == 'null'):
                 continue
                 # return None
             df = pd.read_json(data)
             df['playerId'] = df['playerId'].astype(str)
-            df.drop_duplicates(subset=['playerId'], inplace=True)
-            df.set_index('playerId', inplace=True)
+            if self.agg:
+                df = df.groupby('playerId')[self.use_cols].sum()
+            else:
+                df.drop_duplicates(subset=['playerId'], inplace=True)
+                df.set_index('playerId', inplace=True)
+                df = df[self.use_cols]
             df['date'] = date
-            dfs.append(df[self.use_cols])
+            dfs.append(df)
         return pd.concat(dfs)
 
 
