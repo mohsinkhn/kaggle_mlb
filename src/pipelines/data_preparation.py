@@ -76,21 +76,21 @@ class CreateUpdateArtifact(BaseTransformer):
         return self
 
     def transform(self, X, y=None):
-        playerid_mappings = load_json(self.playerid_mappings_file)
-        df = X.copy()
-        mapping_df = pd.DataFrame.from_dict(
-            playerid_mappings, orient="index", columns=["playeridx"]
-        )
-
-        if (self.artifact_load_path is not None) and (
-            self.artifact_load_path / "data.npy"
-        ).exists():
-            prev_arr, date_mapping = self._load()
-        else:
-            prev_arr, date_mapping = None, {}
-
-        dates = df.date.unique()
         try:
+            playerid_mappings = load_json(self.playerid_mappings_file)
+            df = X.copy()
+            mapping_df = pd.DataFrame.from_dict(
+                playerid_mappings, orient="index", columns=["playeridx"]
+            )
+
+            if (self.artifact_load_path is not None) and (
+                self.artifact_load_path / "data.npy"
+            ).exists():
+                prev_arr, date_mapping = self._load()
+            else:
+                prev_arr, date_mapping = None, {}
+
+            dates = df.date.unique()
             for i, date in tqdm(enumerate(dates), total=len(dates)):
                 tmp = df.loc[df.date == date]
                 arr = pd.merge(mapping_df, tmp, left_index=True, right_index=True, how="left")
@@ -105,10 +105,10 @@ class CreateUpdateArtifact(BaseTransformer):
                     else:
                         prev_arr = np.append(prev_arr, arr, 0)
                         date_mapping[str(date)] = max(date_mapping.values()) + 1
+            self._save(prev_arr, date_mapping)
         except:
             pass
 
-        self._save(prev_arr, date_mapping)
 
     def _load(self):
         prev_arr = np.load(str(self.artifact_load_path / "data.npy"), allow_pickle=True)
