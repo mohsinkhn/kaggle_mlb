@@ -23,7 +23,7 @@ class ParsePlayerData(BaseTransformer):
         for _, row in tqdm(X.iterrows(), total=len(X)):
             data = row[self.field_name]
             date = row['date']
-            if (str(data) == 'nan') or (str(data) == '') or (str(data) == 'NaN') or (str(data) == 'null'):
+            if (str(data) == 'nan') or (str(data) == '') or (str(data) == 'NaN') or (str(data) == 'null') or (str(data) == '<NA>'):
                 continue
                 # return None
             df = pd.read_json(data)
