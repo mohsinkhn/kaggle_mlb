@@ -137,6 +137,20 @@ class ExpandingMax(TimeSeriesTransformer):
         return cp.nanmax(arr, axis=0)
 
 
+class ExpandingVar(TimeSeriesTransformer):
+    """Expanding max based on historical data."""
+
+    def _reduce_func(self, arr):
+        return cp.nanvar(arr, axis=0)
+
+
+class ExpandingMin(TimeSeriesTransformer):
+    """Expanding max based on historical data."""
+
+    def _reduce_func(self, arr):
+        return cp.nanmin(arr, axis=0)
+
+
 class ExpandingMean(TimeSeriesTransformer):
     """Expanding mean based on historical data."""
 
@@ -155,28 +169,28 @@ class ExpandingQ05(TimeSeriesTransformer):
     """Expanding 5th percentile based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.nanquantile(arr, 0.05, axis=0)
+        return cp.quantile(arr, 0.05, axis=0)
 
 
 class ExpandingQ25(TimeSeriesTransformer):
     """Expanding 25th percentile based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.nanquantile(arr, 0.25, axis=0)
+        return cp.quantile(arr, 0.25, axis=0)
 
 
 class ExpandingQ75(TimeSeriesTransformer):
     """Expanding 75th percentile based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.nanquantile(arr, 0.75, axis=0)
+        return cp.quantile(arr, 0.75, axis=0)
 
 
 class ExpandingQ95(TimeSeriesTransformer):
     """Expanding 95th percentile based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.nanquantile(arr, 0.95, axis=0)
+        return cp.quantile(arr, 0.95, axis=0)
 
 
 class LagN(TimeSeriesTransformer):
@@ -266,7 +280,12 @@ class DateTimeFeatures(ArrayTransformer):
         self.format = format
 
     def _transform(self, X, y=None):
-        X = pd.to_datetime(X, format=self.format)
+        if X is None:
+            return None
+        try:
+            X = pd.to_datetime(X, format=self.format)
+        except AttributeError:
+            return None
         Xt = []
         for attr in self.attrs:
             out = getattr(X.dt, attr).values
