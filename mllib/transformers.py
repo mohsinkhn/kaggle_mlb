@@ -69,7 +69,7 @@ class FunctionTransfomer(ArrayTransformer):
 class TimeSeriesTransformer(ArrayTransformer):
     """Expanding operations on historical artifcats."""
 
-    def __init__(self, date_col, user_col, key_cols, hist_data_path, player_mapping, fill_value=-1, N=1000):
+    def __init__(self, date_col, user_col, key_cols, hist_data_path, player_mapping, fill_value=-1, N=1000, skip=0):
         """Initialization."""
         self.date_col = date_col
         self.user_col = user_col
@@ -79,29 +79,24 @@ class TimeSeriesTransformer(ArrayTransformer):
         self.cols = [self.date_col, self.user_col]
         self.FILL_VALUE = fill_value
         self.N = N
+        self.skip = skip
 
     def _transform(self, X):
         # Load past data for aggregation and convert to cupy array
         data, date_mapping = self._load_historical_data(self.hist_data_path)
         data = cp.array(data)
-        tdim, udim, cdim = *data.shape[:2], len(self.key_cols)
+        _, udim, cdim = *data.shape[:2], len(self.key_cols)
         # loop over dates and aggregate data for each date
         dates = X[self.date_col].unique()
         date_to_idx = {}
         results = []
         idx = 0
-        max_date = max(date_mapping.keys())
-        for i, date in enumerate(dates):
-            date = str(date)
-            if date > max_date:
-                idx = tdim
-            else:
-                if date in date_mapping:
-                    idx = date_mapping[date]
-
+        dates_int = np.sort([int(self._shift(d)) for d in date_mapping.keys()])
+        indices = np.searchsorted(dates_int, dates, side='right')
+        for i, idx in enumerate(indices):
             agg = self.agg_date_data(data, idx, udim, cdim)
             results.append(agg)
-            date_to_idx[date] = i
+            date_to_idx[str(dates[i])] = i
         out = cp.stack(results).get()
 
         # map to input dates, playerIds
@@ -122,13 +117,17 @@ class TimeSeriesTransformer(ArrayTransformer):
         if idx == 0:
             agg = cp.ones(shape=(udim, cdim), dtype=np.float32) * self.FILL_VALUE
         else:
-            subdata = data_cp[:idx+1, :, self.key_cols]
+            subdata = data_cp[:idx, :, self.key_cols]
             agg = self._reduce_func(subdata)
         return agg
 
     @abstractmethod
     def _reduce_func(self, arr):
         return cp.nanmean(arr, axis=0)
+
+    def _shift(self, date):
+        date = pd.to_datetime(date, format="%Y%m%d") - pd.Timedelta(self.skip)
+        return f"{date:%Y%m%d}"
 
 
 class ExpandingMax(TimeSeriesTransformer):
@@ -142,14 +141,14 @@ class ExpandingMean(TimeSeriesTransformer):
     """Expanding mean based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.nanmean(arr[:-1], axis=0)
+        return cp.nanmean(arr, axis=0)
 
 
 class ExpandingMedian(TimeSeriesTransformer):
     """Expanding median based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.nanmedian(arr[:-1], axis=0)
+        return cp.nanmedian(arr, axis=0)
 
 
 class ExpandingQ05(TimeSeriesTransformer):
@@ -186,7 +185,22 @@ class LagN(TimeSeriesTransformer):
     def _reduce_func(self, arr):
         if len(arr) < self.N:
             return arr[0]
-        return arr[-self.N]
+        subarr = arr[-self.N]
+        subarr[cp.isnan(subarr)] = self.FILL_VALUE
+        return subarr
+
+
+class UnqLastN(TimeSeriesTransformer):
+    """Unique values in last N"""
+
+    def _reduce_func(self, arr):
+        if len(arr) < self.N:
+            return arr[0]
+        subarr = arr[-self.N:]
+        subarr[cp.isnan(subarr)] = self.FILL_VALUE
+        subarr = cp.sum(subarr[1:] != subarr[:-1], 0)
+        # subarr[cp.isnan(subarr)] = self.FILL_VALUE
+        return subarr
 
 
 class LastNMean(TimeSeriesTransformer):
@@ -194,8 +208,9 @@ class LastNMean(TimeSeriesTransformer):
 
     def _reduce_func(self, arr):
         if len(arr) < self.N:
-            return cp.nanmean(arr, 0)
-        return cp.nanmean(arr[-self.N:], 0)
+            return arr[0]
+        subarr = arr[-self.N:]
+        return cp.nanmean(subarr, 0)
 
 
 class LastNMedian(TimeSeriesTransformer):
@@ -203,8 +218,19 @@ class LastNMedian(TimeSeriesTransformer):
 
     def _reduce_func(self, arr):
         if len(arr) < self.N:
-            return cp.nanmedian(arr, 0)
-        return cp.nanmedian(arr[-self.N:], 0)
+            return arr[0]
+        subarr = arr[-self.N:]
+        return cp.nanmean(subarr, 0)
+
+
+class LastNSum(TimeSeriesTransformer):
+    """Expanding 95th percentile based on historical data."""
+
+    def _reduce_func(self, arr):
+        if len(arr) < self.N:
+            return arr[0]
+        subarr = arr[-self.N:]
+        return cp.nansum(subarr, 0)
 
 
 class OrdinalTransformer(BaseTransformer):
@@ -218,12 +244,20 @@ class OrdinalTransformer(BaseTransformer):
         return self
 
     def transform(self, X, y=None):
-        Xord = self.enc.transform(X[self.cols].astype(str))
-        other_cols = [col for col in X.columns if col not in self.cols]
-        df = X[other_cols]
-        for i, col in enumerate(self.cols):
-            df[col] = Xord[:, i]
-        return df
+        if X is None:
+            return None
+        if not isinstance(X, pd.DataFrame):
+            return None
+        if (len(set(self.cols) - set(X.columns)) == 0):
+            Xord = self.enc.transform(X[self.cols].astype(str))
+            df = pd.DataFrame(Xord, index=X.index, columns=self.cols)
+            other_cols = [col for col in X.columns if col not in self.cols]
+            if len(other_cols) > 0:
+                for col in other_cols:
+                    df[col] = X[col]
+            return df
+        else:
+            return None
 
 
 class DateTimeFeatures(ArrayTransformer):

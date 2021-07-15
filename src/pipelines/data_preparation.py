@@ -20,19 +20,22 @@ class ParsePlayerData(BaseTransformer):
 
     def transform(self, X, y=None):
         dfs = []
+        if not isinstance(X, pd.DataFrame):
+            return None
+        if (self.field_name not in X.columns) or ("date" not in X.columns):
+            return None
         for _, row in tqdm(X.iterrows(), total=len(X)):
+            data = row[self.field_name]
+            if (
+                (str(data) == "nan")
+                or (str(data) == "")
+                or (str(data) == "NaN")
+                or (str(data) == "null")
+                or (str(data) == "<NA>")
+            ):
+                continue
+            date = row["date"]
             try:
-                data = row[self.field_name]
-                if (
-                    (str(data) == "nan")
-                    or (str(data) == "")
-                    or (str(data) == "NaN")
-                    or (str(data) == "null")
-                    or (str(data) == "<NA>")
-                ):
-                    continue
-                    # return None
-                date = row["date"]
                 df = pd.read_json(data)
                 df["playerId"] = df["playerId"].astype(str)
                 if self.agg is not None:
@@ -43,8 +46,10 @@ class ParsePlayerData(BaseTransformer):
                     df = df[self.use_cols]
                 df["date"] = date
                 dfs.append(df)
-            except:
+            except (ValueError, KeyError):
                 continue
+        if len(dfs) == 0:
+            return None
         return pd.concat(dfs)
 
 
