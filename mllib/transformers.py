@@ -137,6 +137,13 @@ class ExpandingMax(TimeSeriesTransformer):
         return cp.nanmax(arr, axis=0)
 
 
+class ExpandingSum(TimeSeriesTransformer):
+    """Expanding max based on historical data."""
+
+    def _reduce_func(self, arr):
+        return cp.nansum(arr, axis=0)
+
+
 class ExpandingVar(TimeSeriesTransformer):
     """Expanding max based on historical data."""
 
@@ -291,3 +298,83 @@ class DateTimeFeatures(ArrayTransformer):
             out = getattr(X.dt, attr).values
             Xt.append(out)
         return np.vstack(Xt).T
+
+
+class MapAttributes(ArrayTransformer):
+    def __init__(self, attr_file='data/players.csv', file_type='csv', map_col='playerId', attr='playerPositionCode'):
+        self.attr_file = attr_file
+        self.attr = attr
+        self.map_col = map_col
+        self.file_type = file_type
+        self.setup()
+
+    def setup(self):
+        if self.file_type == 'csv':
+            self.data = pd.read_csv(self.attr_file)
+            self.data = self.data[[self.map_col, self.attr]].drop_duplicates()
+            self.data = self.data.set_index(self.map_col)[self.attr].to_dict()
+        else:
+            self.data = load_json(self.attr_file)[self.map_col]
+
+    def _transform(self, X, y=None):
+        if X is None:
+            return None
+        if not isinstance(X, pd.DataFrame):
+            return None
+        if self.map_col not in X.columns:
+            return None
+        return X[self.map_col].map(self.data)
+
+
+class Astype(ArrayTransformer):
+    def __init__(self, totype='int32', values_to_map=None):
+        self.totype = totype
+        self.values_to_map = values_to_map
+
+    def _transform(self, X, y=None):
+        if X is None:
+            return None
+
+        Xt = []
+        for row in X:
+            if row[0] in self.values_to_map:
+                Xt.append([self.values_to_map[row[0]]])
+            else:
+                Xt.append([row[0]])
+        return np.array(Xt).astype(self.totype)
+
+
+class DateDiff(ArrayTransformer):
+    def __init__(self, date_col='date', user_col='playerId', diff_col='mlbDebutDate', data_filepath='data/players.csv', format='%Y%m%d'):
+        self.date_col = date_col
+        self.user_col = user_col
+        self.diff_col = diff_col
+        self.format = format
+        self.data_filepath = data_filepath
+        self.setup()
+
+    def setup(self):
+        data = pd.read_csv(self.data_filepath)
+        data[self.diff_col] = pd.to_datetime(data[self.diff_col])
+        data = data[[self.user_col, self.diff_col]].drop_duplicates()
+        self.diffdate = data.set_index(self.user_col)[self.diff_col].to_dict()
+
+    def _transform(self, X, y=None):
+        if X is None:
+            return None
+        Xdt = X[self.user_col].map(self.diffdate)
+        return (pd.to_datetime(X[self.date_col], format=self.format) - Xdt).dt.days
+
+
+class MapSeasonFlag(ArrayTransformer):
+    def __init__(self, date_col='date', season_file="data/seasons.csv"):
+        self.date_col = date_col
+        self.season_file = season_file
+        self.setup()
+
+    def setup(self):
+        seasons = pd.read_csv(self.season_file)
+    
+    def _transform(self, X, y=None):
+        Xdt = pd.to_datetime(X[self.date_col], format="%Y%m%d")
+        years = Xdt.dt.year
