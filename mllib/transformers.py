@@ -364,17 +364,3 @@ class DateDiff(ArrayTransformer):
             return None
         Xdt = X[self.user_col].map(self.diffdate)
         return (pd.to_datetime(X[self.date_col], format=self.format) - Xdt).dt.days
-
-
-class MapSeasonFlag(ArrayTransformer):
-    def __init__(self, date_col='date', season_file="data/seasons.csv"):
-        self.date_col = date_col
-        self.season_file = season_file
-        self.setup()
-
-    def setup(self):
-        seasons = pd.read_csv(self.season_file)
-    
-    def _transform(self, X, y=None):
-        Xdt = pd.to_datetime(X[self.date_col], format="%Y%m%d")
-        years = Xdt.dt.year

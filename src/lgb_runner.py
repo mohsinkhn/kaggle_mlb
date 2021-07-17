@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error as mae
 
-from src.pipelines.data_preparation import ParsePlayerData
+from src.pipelines.artifacts import ParsePlayerData
 
 
 if __name__ == "__main__":
@@ -27,16 +27,12 @@ if __name__ == "__main__":
 
     print(tr_index.shape, vl_index.shape)
 
-    feature_flags = ['1', '2', '3', '31', '32', '33', '34', '4', '41', '5', '6']  # , '3', '4', '5', '6']
-    Xtr, Xvl = [], []
+    feature_flags = ['2', '3', '31', '32', '33', '34', '4', '41', '5', '6', '7']  # , '3', '4', '5', '6']
+    X_tra = np.load("data/features/X_tr1.npy")[:, np.r_[0:8]]
+    X_vla = np.load("data/features/X_vl1.npy")[:, np.r_[0:8]]
     for flag in feature_flags:
-        if flag == '1':
-            Xtr.append(np.load(f"data/features/X_tr{flag}.npy")[:, np.r_[0:8, 16:24]])
-            Xvl.append(np.load(f"data/features/X_vl{flag}.npy")[:, np.r_[0:8, 16:24]])
-        else:
-            Xtr.append(np.load(f"data/features/X_tr{flag}.npy"))
-            Xvl.append(np.load(f"data/features/X_vl{flag}.npy"))
-    X_tra, X_vla = np.hstack(Xtr)[:, :], np.hstack(Xvl)[:, :]
+        X_tra = np.hstack((X_tra, np.load(f"data/features/X_tr{flag}.npy")))
+        X_vla = np.hstack((X_vla, np.load(f"data/features/X_vl{flag}.npy")))
 
     targets = ['target1', 'target2', 'target3', 'target4']
     y_tr = tr_index[targets].values
@@ -67,16 +63,24 @@ if __name__ == "__main__":
 
     params = {
         'n_estimators': 4000,
-        'learning_rate': 0.05,
-        'num_leaves': 127,
-        'min_data_in_leaf': 5,
+        'learning_rate': 0.06,
+        'num_leaves': 255,
+        'min_data_in_leaf': 2,
         'colsample_bytree': 0.4,
-        'subsample': 0.5,
+        'subsample': 0.95,
+        'bagging_freq': 1,
         'reg_alpha': 0.1,
-        'reg_lambda': 0.1,
-        'max_bin': 255,
+        'reg_lambda': 0.01,
+        'max_bin': 127,
+        'device': 'gpu',
+        'gpu_use_dp': False,
+        'gpu_device_id': 0,
+        'boost_from_average': True,
+        'reg_sqrt': True,
         'objective': 'mae',
-        'metric': 'mae'
+        'metric': 'mae',
+        'verbose': -1,
+        'num_threads': 16
     }
     bst1 = lgb.train(params, tr1, valid_sets=[vl1], early_stopping_rounds=200, verbose_eval=50)
     pred1 = bst1.predict(X_vla)

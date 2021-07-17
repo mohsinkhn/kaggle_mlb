@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error as mae
 
-from src.pipelines.data_preparation import ParsePlayerData
+from src.pipelines.artifacts import ParsePlayerData
 
 
 if __name__ == "__main__":
@@ -13,7 +13,7 @@ if __name__ == "__main__":
     train_index = target_enc.fit_transform(raw_data).reset_index(drop=False)
     print(train_index.shape)
 
-    feature_flags = ['1', '2', '3', '31', '32', '33', '34', '4', '41', '5', '6']  # , '3', '4', '5', '6']
+    feature_flags = ['1', '2', '3', '31', '32', '33', '34', '4', '41', '5', '6', '7']  # , '3', '4', '5', '6']
     Xtr = []
     for flag in feature_flags:
         if flag == '1':
@@ -30,19 +30,32 @@ if __name__ == "__main__":
     tr3 = lgb.Dataset(X_tra, y_tr[:, 2])
     tr4 = lgb.Dataset(X_tra, y_tr[:, 3])
 
-    n_ests = [4500, 500, 1000, 3500]
+    n_ests = [4000, 700, 2000, 3000]
+    fixed_params = {
+        'learning_rate': 0.05,
+        'num_leaves': 255,
+        'min_data_in_leaf': 2,
+        'colsample_bytree': 0.4,
+        'subsample': 0.95,
+        'bagging_freq': 1,
+        'reg_alpha': 0.1,
+        'reg_lambda': 0.01,
+        'max_bin': 127,
+        'device': 'gpu',
+        'gpu_use_dp': False,
+        'gpu_device_id': 0,
+        'boost_from_average': True,
+        'reg_sqrt': True,
+        'objective': 'mae',
+        'metric': 'mae',
+        'verbose': -1,
+        'num_threads': 16
+
+    }
+
     params = {
         'n_estimators': n_ests[0],
-        'learning_rate': 0.05,
-        'num_leaves': 127,
-        'min_data_in_leaf': 5,
-        'colsample_bytree': 0.4,
-        'subsample': 0.5,
-        'reg_alpha': 0.1,
-        'reg_lambda': 0.1,
-        'max_bin': 255,
-        'objective': 'mae',
-        'metric': 'mae'
+        **fixed_params
     }
 
     bst1 = lgb.train(params, tr1, verbose_eval=50)
@@ -50,33 +63,15 @@ if __name__ == "__main__":
 
     params = {
         'n_estimators': n_ests[1],
-        'learning_rate': 0.05,
-        'num_leaves': 127,
-        'min_data_in_leaf': 5,
-        'colsample_bytree': 0.4,
-        'subsample': 0.5,
-        'reg_alpha': 0.1,
-        'reg_lambda': 0.1,
-        'max_bin': 255,
-        'objective': 'mae',
-        'metric': 'mae'
-    }
+        **fixed_params
+        }
 
     bst2 = lgb.train(params, tr2, verbose_eval=50)
     bst2.save_model("data/models/bst2_train_v2.pkl")
 
     params = {
         'n_estimators': n_ests[2],
-        'learning_rate': 0.05,
-        'num_leaves': 127,
-        'min_data_in_leaf': 5,
-        'colsample_bytree': 0.4,
-        'subsample': 0.5,
-        'reg_alpha': 0.1,
-        'reg_lambda': 0.1,
-        'max_bin': 255,
-        'objective': 'mae',
-        'metric': 'mae'
+        **fixed_params
     }
 
     bst3 = lgb.train(params, tr3, verbose_eval=50)
@@ -84,16 +79,7 @@ if __name__ == "__main__":
 
     params = {
         'n_estimators': n_ests[3],
-        'learning_rate': 0.05,
-        'num_leaves': 127,
-        'min_data_in_leaf': 5,
-        'colsample_bytree': 0.4,
-        'subsample': 0.5,
-        'reg_alpha': 0.1,
-        'reg_lambda': 0.1,
-        'max_bin': 255,
-        'objective': 'mae',
-        'metric': 'mae'
+        **fixed_params
     }
 
     bst4 = lgb.train(params, tr4, verbose_eval=50)

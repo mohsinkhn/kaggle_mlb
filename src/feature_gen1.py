@@ -26,7 +26,7 @@ from mllib.transformers import (
     Astype,
     DateDiff,
 )
-from src.pipelines.data_preparation import ParsePlayerData
+from src.pipelines.artifacts import ParsePlayerData
 
 
 def get_save_features(pipe, tr_index, vl_index, indicator):
@@ -55,43 +55,43 @@ if __name__ == "__main__":
     tr_index = pd.read_csv("data/tr_index.csv")
     vl_index = pd.read_csv("data/vl_index.csv")
 
-    # features1 = make_union(
-    #     ExpandingMean(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingMedian(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingMax(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingMin(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingQ25(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingQ75(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingQ95(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingQ05(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingMin(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingVar(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingMean(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, N=120, skip=30,
-    #     ), verbose=True
-    # )
-    # get_save_features(features1, tr_index, vl_index, 1)
-    # print("Done features 1")
+    features1 = make_union(
+        ExpandingMean(
+            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
+        ),
+        ExpandingMedian(
+            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
+        ),
+        ExpandingMax(
+            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
+        ),
+        ExpandingMin(
+            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
+        ),
+        ExpandingQ25(
+            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
+        ),
+        ExpandingQ75(
+            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
+        ),
+        ExpandingQ95(
+            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
+        ),
+        ExpandingQ05(
+            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
+        ),
+        ExpandingMin(
+            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
+        ),
+        ExpandingVar(
+            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
+        ),
+        ExpandingMean(
+            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, N=30, skip=3,
+        ), verbose=True
+    )
+    get_save_features(features1, tr_index, vl_index, 1)
+    print("Done features 1")
 
     # features2 = make_union(
     #     *[
@@ -239,45 +239,39 @@ if __name__ == "__main__":
     # )
     # get_save_features(features4, tr_index, vl_index, 4)
 
-    features41 = DateDiff(date_col='date', user_col='playerId', diff_col='mlbDebutDate', data_filepath='data/players.csv', format='%Y%m%d')
-    get_save_features(features41, tr_index, vl_index, 41)
-    # features4 = make_union(
+    # features41 = DateDiff(date_col='date', user_col='playerId', diff_col='mlbDebutDate', data_filepath='data/players.csv', format='%Y%m%d')
+    # get_save_features(features41, tr_index, vl_index, 41)
+
+    # features5 = make_union(
+    #     make_pipeline(
+    #         LastNSum("date", "playerId", [0], "data/tr_awards/", "data/playerid_mappings.json", fill_value=-1, N=1000),
+    #     ), verbose=True
+    # )
+    # get_save_features(features5, tr_index, vl_index, 5)
+    # print("Done features 5")
+
+    # features6 = make_union(
     #     LagN(
     #         "date",
     #         "playerId",
-    #         [0, 1, 2, 3],
-    #         "data/tr_scores/",
+    #         [0],
+    #         "data/tr_transactions/",
     #         "data/playerid_mappings.json",
     #         fill_value=-1,
     #         N=1,
     #     ),
     #     verbose=True,
     # )
-    # get_save_features(features4, tr_index, vl_index, 4)
-    # print("Done features 4")
-
-    features5 = make_union(
-        make_pipeline(
-            LastNSum("date", "playerId", [0], "data/tr_awards/", "data/playerid_mappings.json", fill_value=-1, N=1000),
-        ), verbose=True
-    )
-    get_save_features(features5, tr_index, vl_index, 5)
-    print("Done features 5")
-
-    features6 = make_union(
-        LagN(
-            "date",
-            "playerId",
-            [0],
-            "data/tr_transactions/",
-            "data/playerid_mappings.json",
-            fill_value=-1,
-            N=1,
-        ),
-        verbose=True,
-    )
-    get_save_features(features6, tr_index, vl_index, 6)
-    print("Done features 6")
-    # features6 = make_pipeline(SelectCols("date"), DateTimeFeatures(attrs=["dayofweek"]), verbose=True)
     # get_save_features(features6, tr_index, vl_index, 6)
     # print("Done features 6")
+
+    features7 = make_union(
+        MapAttributes('data/seasons_formatted.csv', 'csv', 'date', 'seasonflag'),
+        DateDiff('date', 'date', 'season_start', 'data/seasons_formatted.csv'),
+        DateDiff('date', 'date', 'season_end', 'data/seasons_formatted.csv'),
+        DateDiff('date', 'date', 'all_star', 'data/seasons_formatted.csv'),
+        verbose=True
+    )
+    get_save_features(features7, tr_index, vl_index, 7)
+    print("Done features 7")
+
