@@ -1,0 +1,377 @@
+read_root: ./data
+save_root: ./data
+data_flag: full
+artifacts_path: ${save_root}/artifacts/${data_flag}
+
+date_field: date
+user_field: playerId
+
+save_prefix: tr
+filter_query: ''
+player_artifact_name: playerid_mapping.pkl
+targets_artifact_name: targets.pkl
+plscores1_artifact_name: plscores1.pkl
+plscores2_artifact_name: plscores2.pkl
+plscores3_artifact_name: plscores3.pkl
+plscores4_artifact_name: plscores4.pkl
+plscores5_artifact_name: plscores4.pkl
+
+prepare_playeridartifact:
+  _target_: sklearn.pipeline.Pipeline
+  steps:
+  - 
+    - dataloader
+    - _target_: src.pipelines.artifacts.DataLoader
+      load_path: ${read_root}
+      ftype: csv
+  -
+    - unique_playerid
+    - _target_: src.pipelines.artifacts.GetUnique
+      field_name: ${user_field}
+  -
+    - save_playerlist
+    - _target_: src.pipelines.artifacts.CreateArtifact
+      save_path: ${artifacts_path}
+      artifact_name: ${player_artifact_name}
+      save_type: joblib
+  verbose: True
+
+prepare_teamidartifact:
+  _target_: sklearn.pipeline.Pipeline
+  steps:
+  - 
+    - dataloader
+    - _target_: src.pipelines.artifacts.DataLoader
+      load_path: ${read_root}
+      ftype: csv
+  -
+    - unique_teamid
+    - _target_: src.pipelines.artifacts.GetUnique
+      field_name: id
+  -
+    - save_teamlist
+    - _target_: src.pipelines.artifacts.CreateArtifact
+      save_path: ${artifacts_path}
+      artifact_name: teamid_mapping.pkl
+      save_type: joblib
+  verbose: True
+
+prepare_targets:
+  _target_: sklearn.pipeline.Pipeline
+  steps:
+  -
+    - parse_engagementfield
+    - _target_: src.pipelines.artifacts.ParseJsonField
+      date_field: ${date_field}
+      data_field: 'nextDayPlayerEngagement'
+      use_cols:
+        - "playerId"
+        - "target1"
+        - "target2"
+        - "target3"
+        - "target4"
+  -
+    - pivot_data
+    - _target_: src.pipelines.artifacts.PivotbyDateUser
+      date_col: ${date_field}
+      user_col: ${user_field}
+      schema_file: ${artifacts_path}/${player_artifact_name}
+      dtype: 'float32'
+  -
+    - save_artifact
+    - _target_: src.pipelines.artifacts.CreateArtifact
+      save_path: ${artifacts_path}
+      artifact_name: ${save_prefix}_${targets_artifact_name}
+      save_type: joblib
+
+prepare_scores1:
+  _target_: sklearn.pipeline.Pipeline
+  steps:
+  -
+    - parse_playerboxscores
+    - _target_: src.pipelines.artifacts.ParseJsonField
+      date_field: ${date_field}
+      data_field: 'playerBoxScores'
+      use_cols:
+        - "playerId"
+        - "home"
+        - "jerseyNum"
+        - "positionCode"
+        - "positionType"
+        - "battingOrder"
+  -
+    - mapposition_type
+    - _target_: src.pipelines.artifacts.MapCol
+      field_name: 'positionType'
+      mapping: 
+        Pitcher: 1
+        Infielder: 2
+        Outfielder: 3
+        Hitter: 4
+        Catcher: 5
+        Runner: 6
+  -
+    - pivot_data
+    - _target_: src.pipelines.artifacts.PivotbyDateUser
+      date_col: ${date_field}
+      user_col: ${user_field}
+      schema_file: ${artifacts_path}/${player_artifact_name}
+      dtype: 'float32'
+  -
+    - save_artifact
+    - _target_: src.pipelines.artifacts.CreateArtifact
+      save_path: ${artifacts_path}
+      artifact_name: ${save_prefix}_${plscores1_artifact_name}
+      save_type: joblib
+
+prepare_scores2:
+  _target_: sklearn.pipeline.Pipeline
+  steps:
+  -
+    - parse_playerboxscores
+    - _target_: src.pipelines.artifacts.ParseJsonField
+      date_field: ${date_field}
+      data_field: 'playerBoxScores'
+      use_cols:
+        - "playerId"
+        - "flyOuts"
+        - "groundOuts"
+        - "runsScored"
+        - "doubles"
+        - "triples"
+        - "homeRuns"
+        - "strikeOuts"
+        - "baseOnBalls"
+        - "intentionalWalks"
+        - "hits"
+        - "hitByPitch"
+        - "atBats"
+        - "caughtStealing"
+        - "stolenBases"
+        - "groundIntoDoublePlay"
+        - "groundIntoTriplePlay"
+        - "plateAppearances"
+        - "totalBases"
+        - "rbi"
+        - "leftOnBase"
+        - "sacBunts"
+        - "sacFlies"
+        - "catchersInterference"
+        - "pickoffs"
+  -
+    - pivot_data
+    - _target_: src.pipelines.artifacts.PivotbyDateUser
+      date_col: ${date_field}
+      user_col: ${user_field}
+      schema_file: ${artifacts_path}/${player_artifact_name}
+      dtype: 'float32'
+  -
+    - save_artifact
+    - _target_: src.pipelines.artifacts.CreateArtifact
+      save_path: ${artifacts_path}
+      artifact_name: ${save_prefix}_${plscores2_artifact_name}
+      save_type: joblib
+
+prepare_scores3:
+  _target_: sklearn.pipeline.Pipeline
+  steps:
+  -
+    - parse_playerboxscores
+    - _target_: src.pipelines.artifacts.ParseJsonField
+      date_field: ${date_field}
+      data_field: 'playerBoxScores'
+      use_cols:
+        - playerId
+        - gamesPlayedBatting
+        - gamesPlayedPitching
+        - gamesStartedPitching
+        - completeGamesPitching
+        - shutoutsPitching
+        - winsPitching
+        - lossesPitching
+        - saveOpportunities
+        - saves
+        - holds
+        - blownSaves
+  -
+    - pivot_data
+    - _target_: src.pipelines.artifacts.PivotbyDateUser
+      date_col: ${date_field}
+      user_col: ${user_field}
+      schema_file: ${artifacts_path}/${player_artifact_name}
+      dtype: 'float32'
+  -
+    - save_artifact
+    - _target_: src.pipelines.artifacts.CreateArtifact
+      save_path: ${artifacts_path}
+      artifact_name: ${save_prefix}_${plscores3_artifact_name}
+      save_type: joblib
+
+prepare_scores4:
+  _target_: sklearn.pipeline.Pipeline
+  steps:
+  -
+    - parse_playerboxscores
+    - _target_: src.pipelines.artifacts.ParseJsonField
+      date_field: ${date_field}
+      data_field: 'playerBoxScores'
+      use_cols:
+        - playerId
+        - flyOutsPitching
+        - airOutsPitching
+        - groundOutsPitching
+        - runsPitching
+        - doublesPitching
+        - triplesPitching
+        - homeRunsPitching
+        - strikeOutsPitching
+        - baseOnBallsPitching 
+        - intentionalWalksPitching
+        - hitsPitching
+        - hitByPitchPitching
+        - atBatsPitching
+        - caughtStealingPitching
+        - stolenBasesPitching
+  -
+    - pivot_data
+    - _target_: src.pipelines.artifacts.PivotbyDateUser
+      date_col: ${date_field}
+      user_col: ${user_field}
+      schema_file: ${artifacts_path}/${player_artifact_name}
+      dtype: 'float32'
+  -
+    - save_artifact
+    - _target_: src.pipelines.artifacts.CreateArtifact
+      save_path: ${artifacts_path}
+      artifact_name: ${save_prefix}_${plscores4_artifact_name}
+      save_type: joblib
+
+prepare_scores5:
+  _target_: sklearn.pipeline.Pipeline
+  steps:
+  -
+    - parse_playerboxscores
+    - _target_: src.pipelines.artifacts.ParseJsonField
+      date_field: ${date_field}
+      data_field: 'playerBoxScores'
+      use_cols:
+        - playerId
+        - inningsPitched
+        - earnedRuns
+        - battersFaced
+        - outsPitching
+        - pitchesThrown
+        - balls
+        - strikes
+        - hitBatsmen
+        - balks 
+        - wildPitches
+        - pickoffsPitching
+        - rbiPitching
+        - inheritedRunners
+        - inheritedRunnersScored
+        - catchersInterferencePitching
+        - sacBuntsPitching
+        - sacFliesPitching
+        - assists
+        - putOuts
+        - errors
+        - chances
+  -
+    - pivot_data
+    - _target_: src.pipelines.artifacts.PivotbyDateUser
+      date_col: ${date_field}
+      user_col: ${user_field}
+      schema_file: ${artifacts_path}/${player_artifact_name}
+      dtype: 'float32'
+  -
+    - save_artifact
+    - _target_: src.pipelines.artifacts.CreateArtifact
+      save_path: ${artifacts_path}
+      artifact_name: ${save_prefix}_${plscores5_artifact_name}
+      save_type: joblib
+
+team_scores1:
+  _target_: sklearn.pipeline.Pipeline
+  steps:
+  -
+    - parse_teamboxscores
+    - _target_: src.pipelines.artifacts.ParseJsonField
+      date_field: ${date_field}
+      data_field: 'teamBoxScores'
+      use_cols:
+        - teamId
+        - "flyOuts"
+        - "groundOuts"
+        - "runsScored"
+        - "doubles"
+        - "triples"
+        - "homeRuns"
+        - "strikeOuts"
+        - "baseOnBalls"
+        - "intentionalWalks"
+        - "hits"
+        - "hitByPitch"
+        - "atBats"
+        - "caughtStealing"
+        - "stolenBases"
+        - "groundIntoDoublePlay"
+        - "groundIntoTriplePlay"
+        - "plateAppearances"
+        - "totalBases"
+        - "rbi"
+        - "leftOnBase"
+        - "sacBunts"
+        - "sacFlies"
+        - "catchersInterference"
+        - "pickoffs"
+  -
+    - pivot_data
+    - _target_: src.pipelines.artifacts.PivotbyDateUser
+      date_col: ${date_field}
+      user_col: teamId
+      schema_file: ${artifacts_path}/${team_artifact_name}
+      dtype: 'float32'
+  -
+    - save_artifact
+    - _target_: src.pipelines.artifacts.CreateArtifact
+      save_path: ${artifacts_path}
+      artifact_name: ${save_prefix}_${tscores1_artifact_name}
+      save_type: joblib
+  
+prepare_3Dartifacts:
+  _target_: sklearn.pipeline.Pipeline
+  steps:
+  -
+    - load_train
+    - _target_: src.pipelines.artifacts.DataLoader
+      load_path: ${read_root}
+      ftype: csv
+  -
+    - filter_rows
+    - _target_: src.pipelines.artifacts.FilterDf
+      filter_query: ${filter_query}
+  -
+    - aggregate_pipelines
+    - _target_: sklearn.pipeline.FeatureUnion
+      transformer_list:
+      - 
+        - targets
+        - ${prepare_targets}
+      -
+        - plscores1
+        - ${prepare_scores1}
+      -
+        - plscores2
+        - ${prepare_scores2}
+      -
+        - plscores3
+        - ${prepare_scores3}
+      -
+        - plscores4
+        - ${prepare_scores4}
+      -
+        - plscores5
+        - ${prepare_scores5}
+
+  verbose: True

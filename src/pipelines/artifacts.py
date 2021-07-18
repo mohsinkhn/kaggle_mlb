@@ -37,7 +37,7 @@ def save_data(data, save_path, artifact_name, save_type):
 
 
 def load_data(load_filepath, file_type):
-    if not load_filepath.exists():
+    if not Path(load_filepath).exists():
         return None
 
     load_filepath = str(load_filepath)
@@ -64,11 +64,10 @@ class DataLoader(BaseTransformer):
         self.ftype = ftype
 
     def _transform(self, filename):
-        try:
-            data = load_data(self.load_path, artifact_name=filename, file_type=self.ftype)
-        except:
+        filepath = str(Path(self.load_path) / filename)
+        data = load_data(filepath, file_type=self.ftype)
+        if data is None:
             print(f"ERROR!!! Not able to load {filename}")
-            data = None
         return data
 
 
@@ -97,29 +96,35 @@ class Update3DArtifact(BaseTransformer):
                  artifact_name=None,
                  save_type='joblib'):
         """Dump data to provided filepaths."""
+        self.date_col = date_col
+        self.user_col = user_col
         self.load_path = load_path
         self.save_path = save_path
         self.artifact_name = artifact_name
         self.save_type = save_type
 
     def _transform(self, data):
+        if data is None:
+            return None
         artifact = load_data(self.load_path, self.save_type)
         prev_arr, dates, users = artifact["data"], artifact[self.date_col], artifact[self.user_col]
         curr_arr, curr_dates, curr_users = data["data"], data[self.date_col], data[self.user_col]
-
+        print("Loaded data ...")
         date_idx_map = {d: i for i, d in enumerate(dates)}
         user_idx_map = {u: i for i, u in enumerate(users)}
 
         curr_users_idx = np.array([user_idx_map[u] for u in curr_users if u in user_idx_map])
         valid_users_idx = np.array([i for i, u in enumerate(curr_users) if u in user_idx_map])
-        for i, date in enumerate(curr_dates):
+        for i, date in tqdm(enumerate(curr_dates)):
             if date in date_idx_map:
                 prev_arr[date_idx_map[date], curr_users_idx] = curr_arr[i, valid_users_idx]
             else:
                 prev_arr = np.append(prev_arr, curr_arr[i, curr_users_idx])
                 dates.append(date)
         data = {'data': prev_arr, self.date_col: dates, self.user_col: users}
+        print("Updating data, Saving ...")
         save_data(data, self.save_path, self.artifact_name, self.save_type)
+        return True
 
 
 class DfTransformer(BaseTransformer):
@@ -132,16 +137,44 @@ class DfTransformer(BaseTransformer):
 
     def _validate_input(self, X):
         if X is None:
+            print("Input is None")
             return False
         if not isinstance(X, pd.DataFrame):
+            print("Input is not a pandas DataFrame")
             return False
         return True
 
 
-class IntegerMapping(DfTransformer):
+class FilterDf(DfTransformer):
+    def __init__(self, filter_query=None):
+        self.filter_query = filter_query
+
+    def _transform(self, X):
+        try:
+            Xt = X.query(self.filter_query)
+        except ValueError:
+            print("Not able to apply filter query.")
+            Xt = X.copy()
+        return Xt
+
+
+class GetUnique(DfTransformer):
+    def __init__(self, field_name=None):
+        self.field_name = field_name
+
     def _transform(self, X: pd.DataFrame, y=None):
-        unq_vals = X[self.field_name].unique()
-        return {val: i for i, val in enumerate(unq_vals)}
+        return X[self.field_name].unique()
+
+
+class MapCol(DfTransformer):
+    def __init__(self, field_name=None, mapping=None, fill_value=0):
+        self.field_name = field_name
+        self.mapping = mapping
+        self.fill_value = fill_value
+
+    def _transform(self, X: pd.DataFrame, y=None):
+        X[self.field_name] = np.array([self.mapping.get(val, self.fill_value) for val in X[self.field_name].values])
+        return X
 
 
 class ParseJsonField(DfTransformer):
@@ -177,13 +210,13 @@ class GroupByAggDF(DfTransformer):
 
     def _transform(self, X, y=None):
         try:
-            return X.groupby(self.grouper).agg(self.agg_dict)
+            return X.groupby(self.grouper).agg(self.agg_dict).reset_index(drop=False)
         except (KeyError, AttributeError):
             return None
 
 
 class PivotbyDateUser(DfTransformer):
-    def __init__(self, date_col="date", user_col="playerId", schema_file=None, dtype='float32', fill_value=-1.0):
+    def __init__(self, date_col="date", user_col="playerId", schema_file=None, dtype='float32', fill_value=np.nan):
         self.date_col = date_col
         self.user_col = user_col
         self.schema_file = schema_file
@@ -191,25 +224,32 @@ class PivotbyDateUser(DfTransformer):
         self.fill_value = fill_value
 
     def _transform(self, X, y=None):
-        if (self.date_col not in X.columns) or (self.playerId not in X.columns):
+        if (self.date_col not in X.columns) or (self.user_col not in X.columns):
             print("Warning! Could not find date/user column in dataframe")
             return None
 
         if not Path(self.schema_file).exists():
             return None
 
-        schema = load_data(self.schema_file, 'json')
-        schema_users = schema.get(self.user_col)
+        schema_users = load_data(self.schema_file, 'joblib')
         schema_user_idx = {u: i for i, u in enumerate(schema_users)}
-
-        unq_dates, indices = np.unique(X[self.date_col].values, return_index=True)  # sunique()
+        valid_rows = np.array([True if u in schema_user_idx else False for u in X[self.user_col].values])
+        unq_dates, indices = np.unique(X[self.date_col].values[valid_rows], return_inverse=True)  # sunique()
         feature_cols = [col for col in X.columns if col not in set([self.date_col, self.user_col])]
-        user_indices = np.array([schema_user_idx[u] for u in X[self.user_col].values])
-        features = X[feature_cols].values
+        user_indices = np.array([schema_user_idx[u] for u in X[self.user_col].values[valid_rows] if u in schema_user_idx])
+        features = X[feature_cols].values[valid_rows]
+        features[features == ''] = np.nan
         del X
         arr = np.ones(shape=(len(unq_dates), len(schema_users), len(feature_cols)), dtype=self.dtype) * self.fill_value
         for i, date in tqdm(enumerate(unq_dates), total=len(unq_dates)):
-            arr[i, user_indices[indices == i], :] = features[indices == i]
+            try:
+                arr[i, user_indices[indices == i], :] = features[indices == i]
+            except TypeError:
+                print(f"Gut typerror in {date}")
+                continue
+            except IndexError:
+                print("Got index error")
+                continue
         return {'data': arr, self.date_col: unq_dates, self.user_col: schema_users}
 
 
