@@ -25,7 +25,7 @@ from mllib.transformers import (
     MapAttributes,
     DateDiff
 )
-from src.pipelines.data_preparation import ParsePlayerData
+from src.pipelines.artifacts import ParsePlayerData
 
 
 def get_save_features(pipe, tr_index, indicator):
@@ -194,23 +194,23 @@ if __name__ == "__main__":
     # get_save_features(features33, tr_index, 33)
     # print("Done features 32")
 
-    features34 = make_union(
-        *[
-            LastNSum(
-                "date",
-                "playerId",
-                list(range(4 * i, 4 * (i + 1))),
-                "data/tr_scores_sum/",
-                "data/playerid_mappings.json",
-                fill_value=-1,
-                N=j,
-            )
-            for i in range(17)
-            for j in [7, 30]
-        ], verbose=True
-    )
-    get_save_features(features34, tr_index, 34)
-    print("Done features 34")
+    # features34 = make_union(
+    #     *[
+    #         LastNSum(
+    #             "date",
+    #             "playerId",
+    #             list(range(4 * i, 4 * (i + 1))),
+    #             "data/tr_scores_sum/",
+    #             "data/playerid_mappings.json",
+    #             fill_value=-1,
+    #             N=j,
+    #         )
+    #         for i in range(17)
+    #         for j in [7, 30]
+    #     ], verbose=True
+    # )
+    # get_save_features(features34, tr_index, 34)
+    # print("Done features 34")
 
     features4 = make_union(
         make_pipeline(
@@ -247,3 +247,14 @@ if __name__ == "__main__":
     )
     get_save_features(features6, tr_index, 6)
     print("Done features 6")
+
+    features7 = make_union(
+        MapAttributes('data/seasons_formatted.csv', 'csv', 'date', 'seasonflag'),
+        DateDiff('date', 'date', 'season_start', 'data/seasons_formatted.csv'),
+        DateDiff('date', 'date', 'season_end', 'data/seasons_formatted.csv'),
+        DateDiff('date', 'date', 'all_star', 'data/seasons_formatted.csv'),
+        verbose=True
+    )
+    get_save_features(features7, tr_index, 7)
+    print("Done features 7")
+

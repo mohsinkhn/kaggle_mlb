@@ -27,9 +27,9 @@ if __name__ == "__main__":
 
     print(tr_index.shape, vl_index.shape)
 
-    feature_flags = ['2', '3', '31', '32', '33', '34', '4', '41', '5', '6', '7']  # , '3', '4', '5', '6']
-    X_tra = np.load("data/features/X_tr1.npy")[:, np.r_[0:8]]
-    X_vla = np.load("data/features/X_vl1.npy")[:, np.r_[0:8]]
+    feature_flags = ['2', '3', '31', '32', '33', '4', '41', '5', '6', '7', '8']  # , '3', '4', '5', '6']
+    X_tra = np.load("data/features/X_tr1.npy")[:, np.r_[0:8, 16:24]]
+    X_vla = np.load("data/features/X_vl1.npy")[:, np.r_[0:8, 16:24]]
     for flag in feature_flags:
         X_tra = np.hstack((X_tra, np.load(f"data/features/X_tr{flag}.npy")))
         X_vla = np.hstack((X_vla, np.load(f"data/features/X_vl{flag}.npy")))
@@ -63,14 +63,16 @@ if __name__ == "__main__":
 
     params = {
         'n_estimators': 4000,
-        'learning_rate': 0.06,
+        'learning_rate': 0.05,
         'num_leaves': 255,
-        'min_data_in_leaf': 2,
-        'colsample_bytree': 0.4,
+        'max_depth': -1,
+        'min_data_in_leaf': 5,
+        'colsample_bytree': 0.25,
         'subsample': 0.95,
         'bagging_freq': 1,
         'reg_alpha': 0.1,
-        'reg_lambda': 0.01,
+        'reg_lambda': 0.1,
+        'extra_trees': False,
         'max_bin': 127,
         'device': 'gpu',
         'gpu_use_dp': False,
@@ -80,6 +82,7 @@ if __name__ == "__main__":
         'objective': 'mae',
         'metric': 'mae',
         'verbose': -1,
+        'seed': 123478659,
         'num_threads': 16
     }
     bst1 = lgb.train(params, tr1, valid_sets=[vl1], early_stopping_rounds=200, verbose_eval=50)

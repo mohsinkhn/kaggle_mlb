@@ -237,13 +237,15 @@ class PivotbyDateUser(DfTransformer):
         unq_dates, indices = np.unique(X[self.date_col].values[valid_rows], return_inverse=True)  # sunique()
         feature_cols = [col for col in X.columns if col not in set([self.date_col, self.user_col])]
         user_indices = np.array([schema_user_idx[u] for u in X[self.user_col].values[valid_rows] if u in schema_user_idx])
-        features = X[feature_cols].values[valid_rows]
-        features[features == ''] = np.nan
-        del X
+        features = X.loc[valid_rows, feature_cols]
+        for col in feature_cols:
+            features[col] = pd.to_numeric(features[col], errors='coerce')
+        features_casted = features.values.astype(self.dtype)
+        del X, features
         arr = np.ones(shape=(len(unq_dates), len(schema_users), len(feature_cols)), dtype=self.dtype) * self.fill_value
         for i, date in tqdm(enumerate(unq_dates), total=len(unq_dates)):
             try:
-                arr[i, user_indices[indices == i], :] = features[indices == i]
+                arr[i, user_indices[indices == i], :] = features_casted[indices == i]
             except TypeError:
                 print(f"Gut typerror in {date}")
                 continue

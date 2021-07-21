@@ -55,43 +55,43 @@ if __name__ == "__main__":
     tr_index = pd.read_csv("data/tr_index.csv")
     vl_index = pd.read_csv("data/vl_index.csv")
 
-    features1 = make_union(
-        ExpandingMean(
-            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
-        ),
-        ExpandingMedian(
-            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
-        ),
-        ExpandingMax(
-            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
-        ),
-        ExpandingMin(
-            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
-        ),
-        ExpandingQ25(
-            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
-        ),
-        ExpandingQ75(
-            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
-        ),
-        ExpandingQ95(
-            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
-        ),
-        ExpandingQ05(
-            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
-        ),
-        ExpandingMin(
-            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
-        ),
-        ExpandingVar(
-            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=3
-        ),
-        ExpandingMean(
-            "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, N=30, skip=3,
-        ), verbose=True
-    )
-    get_save_features(features1, tr_index, vl_index, 1)
-    print("Done features 1")
+    # features1 = make_union(
+    #     ExpandingMean(
+    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
+    #     ),
+    #     ExpandingMedian(
+    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
+    #     ),
+    #     ExpandingMax(
+    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
+    #     ),
+    #     ExpandingMin(
+    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
+    #     ),
+    #     ExpandingQ25(
+    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
+    #     ),
+    #     ExpandingQ75(
+    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
+    #     ),
+    #     ExpandingQ95(
+    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
+    #     ),
+    #     ExpandingQ05(
+    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
+    #     ),
+    #     ExpandingMin(
+    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
+    #     ),
+    #     ExpandingVar(
+    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
+    #     ),
+    #     ExpandingMean(
+    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, N=30, skip=30,
+    #     ), verbose=True
+    # )
+    # get_save_features(features1, tr_index, vl_index, 1)
+    # print("Done features 1")
 
     # features2 = make_union(
     #     *[
@@ -265,13 +265,27 @@ if __name__ == "__main__":
     # get_save_features(features6, tr_index, vl_index, 6)
     # print("Done features 6")
 
-    features7 = make_union(
-        MapAttributes('data/seasons_formatted.csv', 'csv', 'date', 'seasonflag'),
-        DateDiff('date', 'date', 'season_start', 'data/seasons_formatted.csv'),
-        DateDiff('date', 'date', 'season_end', 'data/seasons_formatted.csv'),
-        DateDiff('date', 'date', 'all_star', 'data/seasons_formatted.csv'),
-        verbose=True
-    )
-    get_save_features(features7, tr_index, vl_index, 7)
-    print("Done features 7")
+    # features7 = make_union(
+    #     MapAttributes('data/seasons_formatted.csv', 'csv', 'date', 'seasonflag'),
+    #     DateDiff('date', 'date', 'season_start', 'data/seasons_formatted.csv'),
+    #     DateDiff('date', 'date', 'season_end', 'data/seasons_formatted.csv'),
+    #     DateDiff('date', 'date', 'all_star', 'data/seasons_formatted.csv'),
+    #     verbose=True
+    # )
+    # get_save_features(features7, tr_index, vl_index, 7)
+    # print("Done features 7")
 
+    features8 = make_union(
+        LagN(
+            "date",
+            "playerId",
+            [0],
+            "data/tr_twitter/",
+            "data/playerid_mappings.json",
+            fill_value=-1,
+            N=1,
+        ),
+        verbose=True,
+    )
+    get_save_features(features8, tr_index, vl_index, 8)
+    print("Done features 8")

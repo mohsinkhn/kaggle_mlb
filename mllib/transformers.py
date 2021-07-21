@@ -3,6 +3,7 @@
 from abc import abstractmethod
 
 import cupy as cp
+import joblib
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -69,41 +70,52 @@ class FunctionTransfomer(ArrayTransformer):
 class TimeSeriesTransformer(ArrayTransformer):
     """Expanding operations on historical artifcats."""
 
-    def __init__(self, date_col, user_col, key_cols, hist_data_path, player_mapping, fill_value=-1, N=1000, skip=0):
+    def __init__(self, date_col, user_col, key_cols, hist_data_path, player_mapping, fill_value=-1, N=1000, skip=0, device='cpu'):
         """Initialization."""
         self.date_col = date_col
         self.user_col = user_col
         self.key_cols = key_cols
         self.hist_data_path = hist_data_path
-        self.player_mapping = load_json(player_mapping)
+        # self.player_mapping = load_json(player_mapping)
         self.cols = [self.date_col, self.user_col]
         self.FILL_VALUE = fill_value
         self.N = N
         self.skip = skip
+        self.device = device
 
     def _transform(self, X):
         # Load past data for aggregation and convert to cupy array
-        data, date_mapping = self._load_historical_data(self.hist_data_path)
-        data = cp.array(data)
+        hist_data = joblib.load(self.hist_data_path)
+        if self.device == 'cpu':
+            data = np.array(hist_data['data'])
+        else:
+            data = cp.array(hist_data['data'])
+        hdates, hplayers = hist_data[self.date_col], hist_data[self.user_col]
+        player_mapping = {u: i for i, u in enumerate(hplayers)}
+        # date_mapping = {d: i for i, d in enumerate(hdates)}
         _, udim, cdim = *data.shape[:2], len(self.key_cols)
         # loop over dates and aggregate data for each date
         dates = X[self.date_col].unique()
         date_to_idx = {}
         results = []
         idx = 0
-        dates_int = np.sort([int(self._shift(d)) for d in date_mapping.keys()])
+        dates_int = np.array([int(self._shift(d)) for d in hdates])
         indices = np.searchsorted(dates_int, dates, side='right')
         for i, idx in enumerate(indices):
             agg = self.agg_date_data(data, idx, udim, cdim)
             results.append(agg)
-            date_to_idx[str(dates[i])] = i
-        out = cp.stack(results).get()
+            date_to_idx[dates[i]] = i
+
+        if self.device == 'cpu':
+            out = np.stack(results)
+        else:
+            out = cp.stack(results).get()
 
         # map to input dates, playerIds
         Xt = []
         for dt, pid in X[self.cols].values:
-            if str(pid) in self.player_mapping:
-                Xt.append(out[date_to_idx[str(dt)], self.player_mapping[str(pid)]])
+            if pid in player_mapping:
+                Xt.append(out[date_to_idx[dt], player_mapping[pid]])
             else:
                 Xt.append(np.ones(shape=(out.shape[2],)) * self.FILL_VALUE)
         return np.array(Xt)
@@ -115,7 +127,11 @@ class TimeSeriesTransformer(ArrayTransformer):
 
     def agg_date_data(self, data_cp, idx, udim, cdim):
         if idx == 0:
-            agg = cp.ones(shape=(udim, cdim), dtype=np.float32) * self.FILL_VALUE
+            if self.device == 'cpu':
+                agg = np.ones(shape=(udim, cdim), dtype=np.float32) * self.FILL_VALUE
+            else:
+                agg = cp.ones(shape=(udim, cdim), dtype=np.float32) * self.FILL_VALUE
+
         else:
             subdata = data_cp[:idx, :, self.key_cols]
             agg = self._reduce_func(subdata)
@@ -126,7 +142,7 @@ class TimeSeriesTransformer(ArrayTransformer):
         return cp.nanmean(arr, axis=0)
 
     def _shift(self, date):
-        date = pd.to_datetime(date, format="%Y%m%d") - pd.Timedelta(self.skip)
+        date = pd.to_datetime(str(date), format="%Y%m%d") + pd.Timedelta(days=self.skip)
         return f"{date:%Y%m%d}"
 
 
@@ -134,70 +150,92 @@ class ExpandingMax(TimeSeriesTransformer):
     """Expanding max based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.nanmax(arr, axis=0)
+        if self.device == "cpu":
+            return np.nanmax(arr[-self.N:], axis=0)
+        else:
+            return cp.nanmax(arr[-self.N:], axis=0)
 
 
 class ExpandingSum(TimeSeriesTransformer):
     """Expanding max based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.nansum(arr, axis=0)
+        if self.device == "cpu":
+            return np.nansum(arr[-self.N:], axis=0)
+        else:
+            return cp.nansum(arr[-self.N:], axis=0)
+
+
+class ExpandingCount(TimeSeriesTransformer):
+    """Expanding max based on historical data."""
+
+    def _reduce_func(self, arr):
+        if self.device == "cpu":
+            return np.count_nonzero(~np.isnan(arr[-self.N:]), axis=0)
+        else:
+            return cp.count_nonzero(~np.isnan(arr[-self.N:]), axis=0)
 
 
 class ExpandingVar(TimeSeriesTransformer):
     """Expanding max based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.nanvar(arr, axis=0)
+        return cp.nanvar(arr[-self.N:], axis=0)
 
 
 class ExpandingMin(TimeSeriesTransformer):
     """Expanding max based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.nanmin(arr, axis=0)
+        return cp.nanmin(arr[-self.N:], axis=0)
 
 
 class ExpandingMean(TimeSeriesTransformer):
     """Expanding mean based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.nanmean(arr, axis=0)
+        if self.device == "cpu":
+            return np.nanmean(arr[-self.N:], axis=0)
+        else:
+            return cp.nanmean(arr[-self.N:], axis=0)
 
 
 class ExpandingMedian(TimeSeriesTransformer):
     """Expanding median based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.nanmedian(arr, axis=0)
+        if self.device == "cpu":
+            return np.nanmedian(arr[-self.N:], axis=0)
+        else:
+            return cp.nanmedian(arr[-self.N:], axis=0)
 
 
 class ExpandingQ05(TimeSeriesTransformer):
     """Expanding 5th percentile based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.quantile(arr, 0.05, axis=0)
+        return cp.quantile(arr[-self.N:], 0.05, axis=0)
 
 
 class ExpandingQ25(TimeSeriesTransformer):
     """Expanding 25th percentile based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.quantile(arr, 0.25, axis=0)
+        return cp.quantile(arr[-self.N:], 0.25, axis=0)
 
 
 class ExpandingQ75(TimeSeriesTransformer):
     """Expanding 75th percentile based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.quantile(arr, 0.75, axis=0)
+        return cp.quantile(arr[-self.N:], 0.75, axis=0)
 
 
 class ExpandingQ95(TimeSeriesTransformer):
     """Expanding 95th percentile based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.quantile(arr, 0.95, axis=0)
+        return cp.quantile(arr[-self.N:], 0.95, axis=0)
 
 
 class LagN(TimeSeriesTransformer):
@@ -207,7 +245,10 @@ class LagN(TimeSeriesTransformer):
         if len(arr) < self.N:
             return arr[0]
         subarr = arr[-self.N]
-        subarr[cp.isnan(subarr)] = self.FILL_VALUE
+        if self.device == 'cpu':
+            subarr[np.isnan(subarr)] = self.FILL_VALUE
+        else:
+            subarr[cp.isnan(subarr)] = self.FILL_VALUE
         return subarr
 
 
