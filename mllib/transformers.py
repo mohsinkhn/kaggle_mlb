@@ -2,7 +2,10 @@
 
 from abc import abstractmethod
 
-import cupy as cp
+try:
+    import cupy as cp
+except ImportError:
+    print("Unable to import cupy")
 import joblib
 import numpy as np
 import pandas as pd
