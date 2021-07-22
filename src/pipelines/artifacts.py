@@ -256,12 +256,16 @@ class PivotbyDateUser(DfTransformer):
             return None
 
         schema_users = load_data(self.schema_file, 'joblib')
-        schema_user_idx = {u: i for i, u in enumerate(schema_users)}
-        valid_rows = np.array([True if u in schema_user_idx else False for u in X[self.user_col].values])
-        X = X.loc[valid_rows]
-        unq_dates, indices = np.unique(X[self.date_col].values, return_inverse=True)  # sunique()
-        feature_cols = [col for col in X.columns if col not in set([self.date_col, self.user_col])]
-        user_indices = np.array([schema_user_idx[u] for u in X[self.user_col].values if u in schema_user_idx])
+        schema_user_idx = {int(u): i for i, u in enumerate(schema_users)}
+        try:
+            X = X.dropna(subset=[self.user_col])
+            valid_rows = np.array([True if int(u) in schema_user_idx else False for u in X[self.user_col].values])
+            X = X.loc[valid_rows]
+            unq_dates, indices = np.unique(X[self.date_col].astype(str).values, return_inverse=True)  # sunique()
+            feature_cols = [col for col in X.columns if col not in set([self.date_col, self.user_col])]
+            user_indices = np.array([schema_user_idx[int(u)] for u in X[self.user_col].values if u in schema_user_idx])
+        except (TypeError, ValueError):
+            print("Couldnt convert playerId to int")
         features = X[feature_cols]
         for col in feature_cols:
             features[col] = pd.to_numeric(features[col], errors='coerce')
