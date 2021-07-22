@@ -37,6 +37,9 @@ def save_data(data, save_path, artifact_name, save_type):
 
 
 def load_data(load_filepath, file_type):
+    if load_filepath is None:
+        return None
+
     if not Path(load_filepath).exists():
         return None
 
@@ -106,21 +109,35 @@ class Update3DArtifact(BaseTransformer):
     def _transform(self, data):
         if data is None:
             return None
-        artifact = load_data(self.load_path, self.save_type)
-        prev_arr, dates, users = artifact["data"], artifact[self.date_col], artifact[self.user_col]
+
         curr_arr, curr_dates, curr_users = data["data"], data[self.date_col], data[self.user_col]
-        print("Loaded data ...")
-        date_idx_map = {d: i for i, d in enumerate(dates)}
-        user_idx_map = {u: i for i, u in enumerate(users)}
+
+        if (self.load_path is not None) and Path(self.load_path).exists():
+            artifact = load_data(self.load_path, self.save_type)
+            prev_arr, dates, users = artifact["data"], artifact[self.date_col], artifact[self.user_col]
+            date_idx_map = {d: i for i, d in enumerate(dates)}
+            user_idx_map = {u: i for i, u in enumerate(users)}
+        else:
+            date_idx_map = {}
+            prev_arr, dates = [], []
+            users = curr_users[:]
+            user_idx_map = {u: i for i, u in enumerate(curr_users)}
 
         curr_users_idx = np.array([user_idx_map[u] for u in curr_users if u in user_idx_map])
         valid_users_idx = np.array([i for i, u in enumerate(curr_users) if u in user_idx_map])
+
+        print("Loaded data ...")
+
         for i, date in tqdm(enumerate(curr_dates)):
             if date in date_idx_map:
                 prev_arr[date_idx_map[date], curr_users_idx] = curr_arr[i, valid_users_idx]
             else:
-                prev_arr = np.append(prev_arr, curr_arr[i, curr_users_idx])
+                if len(prev_arr) > 0:
+                    prev_arr = np.vstack((prev_arr, np.expand_dims(curr_arr[i, curr_users_idx, :], 0)))
+                else:
+                    prev_arr = np.expand_dims(curr_arr[i, curr_users_idx, :], 0)
                 dates.append(date)
+
         data = {'data': prev_arr, self.date_col: dates, self.user_col: users}
         print("Updating data, Saving ...")
         save_data(data, self.save_path, self.artifact_name, self.save_type)
