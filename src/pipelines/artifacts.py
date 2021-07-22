@@ -32,7 +32,11 @@ def save_data(data, save_path, artifact_name, save_type):
         except TypeError:
             return False, "Not able to save as json file"
     else:
-        joblib.dump(data, save_filepath)
+        try:
+            joblib.dump(data, save_filepath)
+        except Exception:
+            return False, "joblib save error"
+
     return True, None
 
 
@@ -133,9 +137,9 @@ class Update3DArtifact(BaseTransformer):
                 prev_arr[date_idx_map[date], curr_users_idx] = curr_arr[i, valid_users_idx]
             else:
                 if len(prev_arr) > 0:
-                    prev_arr = np.vstack((prev_arr, np.expand_dims(curr_arr[i, curr_users_idx, :], 0)))
+                    prev_arr = np.vstack((prev_arr, np.expand_dims(curr_arr[i, curr_users_idx], 0)))
                 else:
-                    prev_arr = np.expand_dims(curr_arr[i, curr_users_idx, :], 0)
+                    prev_arr = np.expand_dims(curr_arr[i, curr_users_idx], 0)
                 dates.append(date)
 
         data = {'data': prev_arr, self.date_col: dates, self.user_col: users}
@@ -190,6 +194,8 @@ class MapCol(DfTransformer):
         self.fill_value = fill_value
 
     def _transform(self, X: pd.DataFrame, y=None):
+        if self.field_name not in X.columns:
+            return None
         X[self.field_name] = np.array([self.mapping.get(val, self.fill_value) for val in X[self.field_name].values])
         return X
 
@@ -241,6 +247,7 @@ class PivotbyDateUser(DfTransformer):
         self.fill_value = fill_value
 
     def _transform(self, X, y=None):
+        X = X.copy()
         if (self.date_col not in X.columns) or (self.user_col not in X.columns):
             print("Warning! Could not find date/user column in dataframe")
             return None
@@ -251,10 +258,11 @@ class PivotbyDateUser(DfTransformer):
         schema_users = load_data(self.schema_file, 'joblib')
         schema_user_idx = {u: i for i, u in enumerate(schema_users)}
         valid_rows = np.array([True if u in schema_user_idx else False for u in X[self.user_col].values])
-        unq_dates, indices = np.unique(X[self.date_col].values[valid_rows], return_inverse=True)  # sunique()
+        X = X.loc[valid_rows]
+        unq_dates, indices = np.unique(X[self.date_col].values, return_inverse=True)  # sunique()
         feature_cols = [col for col in X.columns if col not in set([self.date_col, self.user_col])]
-        user_indices = np.array([schema_user_idx[u] for u in X[self.user_col].values[valid_rows] if u in schema_user_idx])
-        features = X.loc[valid_rows, feature_cols]
+        user_indices = np.array([schema_user_idx[u] for u in X[self.user_col].values if u in schema_user_idx])
+        features = X[feature_cols]
         for col in feature_cols:
             features[col] = pd.to_numeric(features[col], errors='coerce')
         features_casted = features.values.astype(self.dtype)
@@ -264,7 +272,7 @@ class PivotbyDateUser(DfTransformer):
             try:
                 arr[i, user_indices[indices == i], :] = features_casted[indices == i]
             except TypeError:
-                print(f"Gut typerror in {date}")
+                print(f"Got typerror in {date}")
                 continue
             except IndexError:
                 print("Got index error")

@@ -73,7 +73,18 @@ class FunctionTransfomer(ArrayTransformer):
 class TimeSeriesTransformer(ArrayTransformer):
     """Expanding operations on historical artifcats."""
 
-    def __init__(self, date_col, user_col, key_cols, hist_data_path, player_mapping, fill_value=-1, N=1000, skip=0, device='cpu'):
+    def __init__(
+        self,
+        date_col,
+        user_col,
+        key_cols,
+        hist_data_path,
+        player_mapping,
+        fill_value=-1,
+        N=1000,
+        skip=0,
+        device="cpu",
+    ):
         """Initialization."""
         self.date_col = date_col
         self.user_col = user_col
@@ -89,10 +100,10 @@ class TimeSeriesTransformer(ArrayTransformer):
     def _transform(self, X):
         # Load past data for aggregation and convert to cupy array
         hist_data = joblib.load(self.hist_data_path)
-        if self.device == 'cpu':
-            data = np.array(hist_data['data'])
+        if self.device == "cpu":
+            data = hist_data["data"]
         else:
-            data = cp.array(hist_data['data'])
+            data = cp.array(hist_data["data"])
         hdates, hplayers = hist_data[self.date_col], hist_data[self.user_col]
         player_mapping = {u: i for i, u in enumerate(hplayers)}
         # date_mapping = {d: i for i, d in enumerate(hdates)}
@@ -103,13 +114,13 @@ class TimeSeriesTransformer(ArrayTransformer):
         results = []
         idx = 0
         dates_int = np.array([int(self._shift(d)) for d in hdates])
-        indices = np.searchsorted(dates_int, dates, side='right')
+        indices = np.searchsorted(dates_int, dates, side="right")
         for i, idx in enumerate(indices):
             agg = self.agg_date_data(data, idx, udim, cdim)
             results.append(agg)
             date_to_idx[dates[i]] = i
 
-        if self.device == 'cpu':
+        if self.device == "cpu":
             out = np.stack(results)
         else:
             out = cp.stack(results).get()
@@ -124,13 +135,13 @@ class TimeSeriesTransformer(ArrayTransformer):
         return np.array(Xt)
 
     def _load_historical_data(self, filepath):
-        data = np.load(str(Path(filepath) / 'data.npy')).astype(np.float32)
-        date_mapping = load_json(str(Path(filepath) / 'date_mapping.json'))
+        data = np.load(str(Path(filepath) / "data.npy")).astype(np.float32)
+        date_mapping = load_json(str(Path(filepath) / "date_mapping.json"))
         return data, date_mapping
 
     def agg_date_data(self, data_cp, idx, udim, cdim):
         if idx == 0:
-            if self.device == 'cpu':
+            if self.device == "cpu":
                 agg = np.ones(shape=(udim, cdim), dtype=np.float32) * self.FILL_VALUE
             else:
                 agg = cp.ones(shape=(udim, cdim), dtype=np.float32) * self.FILL_VALUE
@@ -154,9 +165,9 @@ class ExpandingMax(TimeSeriesTransformer):
 
     def _reduce_func(self, arr):
         if self.device == "cpu":
-            return np.nanmax(arr[-self.N:], axis=0)
+            return np.nanmax(arr[-self.N :], axis=0)
         else:
-            return cp.nanmax(arr[-self.N:], axis=0)
+            return cp.nanmax(arr[-self.N :], axis=0)
 
 
 class ExpandingSum(TimeSeriesTransformer):
@@ -164,9 +175,9 @@ class ExpandingSum(TimeSeriesTransformer):
 
     def _reduce_func(self, arr):
         if self.device == "cpu":
-            return np.nansum(arr[-self.N:], axis=0)
+            return np.nansum(arr[-self.N :], axis=0)
         else:
-            return cp.nansum(arr[-self.N:], axis=0)
+            return cp.nansum(arr[-self.N :], axis=0)
 
 
 class ExpandingCount(TimeSeriesTransformer):
@@ -174,23 +185,23 @@ class ExpandingCount(TimeSeriesTransformer):
 
     def _reduce_func(self, arr):
         if self.device == "cpu":
-            return np.count_nonzero(~np.isnan(arr[-self.N:]), axis=0)
+            return np.count_nonzero(~np.isnan(arr[-self.N :]), axis=0)
         else:
-            return cp.count_nonzero(~np.isnan(arr[-self.N:]), axis=0)
+            return cp.count_nonzero(~np.isnan(arr[-self.N :]), axis=0)
 
 
 class ExpandingVar(TimeSeriesTransformer):
     """Expanding max based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.nanvar(arr[-self.N:], axis=0)
+        return cp.nanvar(arr[-self.N :], axis=0)
 
 
 class ExpandingMin(TimeSeriesTransformer):
     """Expanding max based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.nanmin(arr[-self.N:], axis=0)
+        return cp.nanmin(arr[-self.N :], axis=0)
 
 
 class ExpandingMean(TimeSeriesTransformer):
@@ -198,9 +209,9 @@ class ExpandingMean(TimeSeriesTransformer):
 
     def _reduce_func(self, arr):
         if self.device == "cpu":
-            return np.nanmean(arr[-self.N:], axis=0)
+            return np.nanmean(arr[-self.N :], axis=0)
         else:
-            return cp.nanmean(arr[-self.N:], axis=0)
+            return cp.nanmean(arr[-self.N :], axis=0)
 
 
 class ExpandingMedian(TimeSeriesTransformer):
@@ -208,37 +219,37 @@ class ExpandingMedian(TimeSeriesTransformer):
 
     def _reduce_func(self, arr):
         if self.device == "cpu":
-            return np.nanmedian(arr[-self.N:], axis=0)
+            return np.nanmedian(arr[-self.N :], axis=0)
         else:
-            return cp.nanmedian(arr[-self.N:], axis=0)
+            return cp.nanmedian(arr[-self.N :], axis=0)
 
 
 class ExpandingQ05(TimeSeriesTransformer):
     """Expanding 5th percentile based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.quantile(arr[-self.N:], 0.05, axis=0)
+        return cp.quantile(arr[-self.N :], 0.05, axis=0)
 
 
 class ExpandingQ25(TimeSeriesTransformer):
     """Expanding 25th percentile based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.quantile(arr[-self.N:], 0.25, axis=0)
+        return cp.quantile(arr[-self.N :], 0.25, axis=0)
 
 
 class ExpandingQ75(TimeSeriesTransformer):
     """Expanding 75th percentile based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.quantile(arr[-self.N:], 0.75, axis=0)
+        return cp.quantile(arr[-self.N :], 0.75, axis=0)
 
 
 class ExpandingQ95(TimeSeriesTransformer):
     """Expanding 95th percentile based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.quantile(arr[-self.N:], 0.95, axis=0)
+        return cp.quantile(arr[-self.N :], 0.95, axis=0)
 
 
 class LagN(TimeSeriesTransformer):
@@ -248,7 +259,7 @@ class LagN(TimeSeriesTransformer):
         if len(arr) < self.N:
             return arr[0]
         subarr = arr[-self.N]
-        if self.device == 'cpu':
+        if self.device == "cpu":
             subarr[np.isnan(subarr)] = self.FILL_VALUE
         else:
             subarr[cp.isnan(subarr)] = self.FILL_VALUE
@@ -261,7 +272,7 @@ class UnqLastN(TimeSeriesTransformer):
     def _reduce_func(self, arr):
         if len(arr) < self.N:
             return arr[0]
-        subarr = arr[-self.N:]
+        subarr = arr[-self.N :]
         subarr[cp.isnan(subarr)] = self.FILL_VALUE
         subarr = cp.sum(subarr[1:] != subarr[:-1], 0)
         # subarr[cp.isnan(subarr)] = self.FILL_VALUE
@@ -274,7 +285,7 @@ class LastNMean(TimeSeriesTransformer):
     def _reduce_func(self, arr):
         if len(arr) < self.N:
             return arr[0]
-        subarr = arr[-self.N:]
+        subarr = arr[-self.N :]
         return cp.nanmean(subarr, 0)
 
 
@@ -284,7 +295,7 @@ class LastNMedian(TimeSeriesTransformer):
     def _reduce_func(self, arr):
         if len(arr) < self.N:
             return arr[0]
-        subarr = arr[-self.N:]
+        subarr = arr[-self.N :]
         return cp.nanmean(subarr, 0)
 
 
@@ -294,15 +305,16 @@ class LastNSum(TimeSeriesTransformer):
     def _reduce_func(self, arr):
         if len(arr) < self.N:
             return arr[0]
-        subarr = arr[-self.N:]
+        subarr = arr[-self.N :]
         return cp.nansum(subarr, 0)
 
 
 class OrdinalTransformer(BaseTransformer):
     """Encode some of the columns from dataframe as ordinal values."""
+
     def __init__(self, cols):
         self.cols = cols
-        self.enc = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
+        self.enc = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)
 
     def fit(self, X, y=None):
         self.enc.fit(X[self.cols].astype(str))
@@ -313,7 +325,7 @@ class OrdinalTransformer(BaseTransformer):
             return None
         if not isinstance(X, pd.DataFrame):
             return None
-        if (len(set(self.cols) - set(X.columns)) == 0):
+        if len(set(self.cols) - set(X.columns)) == 0:
             Xord = self.enc.transform(X[self.cols].astype(str))
             df = pd.DataFrame(Xord, index=X.index, columns=self.cols)
             other_cols = [col for col in X.columns if col not in self.cols]
@@ -326,7 +338,7 @@ class OrdinalTransformer(BaseTransformer):
 
 
 class DateTimeFeatures(ArrayTransformer):
-    def __init__(self, attrs=['dayofweek', 'day'], format='%Y%m%d'):
+    def __init__(self, attrs=["dayofweek", "day"], format="%Y%m%d"):
         self.attrs = attrs
         self.format = format
 
@@ -345,7 +357,13 @@ class DateTimeFeatures(ArrayTransformer):
 
 
 class MapAttributes(ArrayTransformer):
-    def __init__(self, attr_file='data/players.csv', file_type='csv', map_col='playerId', attr='playerPositionCode'):
+    def __init__(
+        self,
+        attr_file="data/players.csv",
+        file_type="csv",
+        map_col="playerId",
+        attr="playerPositionCode",
+    ):
         self.attr_file = attr_file
         self.attr = attr
         self.map_col = map_col
@@ -353,7 +371,7 @@ class MapAttributes(ArrayTransformer):
         self.setup()
 
     def setup(self):
-        if self.file_type == 'csv':
+        if self.file_type == "csv":
             self.data = pd.read_csv(self.attr_file)
             self.data = self.data[[self.map_col, self.attr]].drop_duplicates()
             self.data = self.data.set_index(self.map_col)[self.attr].to_dict()
@@ -371,7 +389,7 @@ class MapAttributes(ArrayTransformer):
 
 
 class Astype(ArrayTransformer):
-    def __init__(self, totype='int32', values_to_map=None):
+    def __init__(self, totype="int32", values_to_map=None):
         self.totype = totype
         self.values_to_map = values_to_map
 
@@ -389,7 +407,14 @@ class Astype(ArrayTransformer):
 
 
 class DateDiff(ArrayTransformer):
-    def __init__(self, date_col='date', user_col='playerId', diff_col='mlbDebutDate', data_filepath='data/players.csv', format='%Y%m%d'):
+    def __init__(
+        self,
+        date_col="date",
+        user_col="playerId",
+        diff_col="mlbDebutDate",
+        data_filepath="data/players.csv",
+        format="%Y%m%d",
+    ):
         self.date_col = date_col
         self.user_col = user_col
         self.diff_col = diff_col
