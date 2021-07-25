@@ -75,12 +75,11 @@ class TimeSeriesTransformer(ArrayTransformer):
 
     def __init__(
         self,
-        date_col,
-        user_col,
-        key_cols,
-        hist_data_path,
-        player_mapping,
-        fill_value=-1,
+        date_col='date',
+        user_col='playerId',
+        key_cols=None,
+        hist_data_path=None,
+        fill_value=np.nan,
         N=1000,
         skip=0,
         device="cpu",
@@ -90,7 +89,6 @@ class TimeSeriesTransformer(ArrayTransformer):
         self.user_col = user_col
         self.key_cols = key_cols
         self.hist_data_path = hist_data_path
-        # self.player_mapping = load_json(player_mapping)
         self.cols = [self.date_col, self.user_col]
         self.FILL_VALUE = fill_value
         self.N = N
@@ -101,9 +99,9 @@ class TimeSeriesTransformer(ArrayTransformer):
         # Load past data for aggregation and convert to cupy array
         hist_data = joblib.load(self.hist_data_path)
         if self.device == "cpu":
-            data = hist_data["data"]
+            data = hist_data["data"][:, :, self.key_cols]
         else:
-            data = cp.array(hist_data["data"])
+            data = cp.array(hist_data["data"][:, :, self.key_cols])
         hdates, hplayers = hist_data[self.date_col], hist_data[self.user_col]
         player_mapping = {u: i for i, u in enumerate(hplayers)}
         # date_mapping = {d: i for i, d in enumerate(hdates)}
@@ -134,11 +132,6 @@ class TimeSeriesTransformer(ArrayTransformer):
                 Xt.append(np.ones(shape=(out.shape[2],)) * self.FILL_VALUE)
         return np.array(Xt)
 
-    def _load_historical_data(self, filepath):
-        data = np.load(str(Path(filepath) / "data.npy")).astype(np.float32)
-        date_mapping = load_json(str(Path(filepath) / "date_mapping.json"))
-        return data, date_mapping
-
     def agg_date_data(self, data_cp, idx, udim, cdim):
         if idx == 0:
             if self.device == "cpu":
@@ -147,7 +140,7 @@ class TimeSeriesTransformer(ArrayTransformer):
                 agg = cp.ones(shape=(udim, cdim), dtype=np.float32) * self.FILL_VALUE
 
         else:
-            subdata = data_cp[:idx, :, self.key_cols]
+            subdata = data_cp[:idx, :, :]
             agg = self._reduce_func(subdata)
         return agg
 
@@ -356,38 +349,6 @@ class DateTimeFeatures(ArrayTransformer):
         return np.vstack(Xt).T
 
 
-class MapAttributes(ArrayTransformer):
-    def __init__(
-        self,
-        attr_file="data/players.csv",
-        file_type="csv",
-        map_col="playerId",
-        attr="playerPositionCode",
-    ):
-        self.attr_file = attr_file
-        self.attr = attr
-        self.map_col = map_col
-        self.file_type = file_type
-        self.setup()
-
-    def setup(self):
-        if self.file_type == "csv":
-            self.data = pd.read_csv(self.attr_file)
-            self.data = self.data[[self.map_col, self.attr]].drop_duplicates()
-            self.data = self.data.set_index(self.map_col)[self.attr].to_dict()
-        else:
-            self.data = load_json(self.attr_file)[self.map_col]
-
-    def _transform(self, X, y=None):
-        if X is None:
-            return None
-        if not isinstance(X, pd.DataFrame):
-            return None
-        if self.map_col not in X.columns:
-            return None
-        return X[self.map_col].map(self.data)
-
-
 class Astype(ArrayTransformer):
     def __init__(self, totype="int32", values_to_map=None):
         self.totype = totype
@@ -433,3 +394,101 @@ class DateDiff(ArrayTransformer):
             return None
         Xdt = X[self.user_col].map(self.diffdate)
         return (pd.to_datetime(X[self.date_col], format=self.format) - Xdt).dt.days
+
+
+class DateTransformer(ArrayTransformer):
+    """Expanding operations on historical artifcats."""
+
+    def __init__(
+        self,
+        date_col,
+        key_cols,
+        hist_data_path,
+        fill_value=-1,
+        N=1000,
+        skip=0,
+        device="cpu",
+    ):
+        """Initialization."""
+        self.date_col = date_col
+        self.key_cols = key_cols
+        self.hist_data_path = hist_data_path
+        # self.player_mapping = load_json(player_mapping)
+        self.FILL_VALUE = fill_value
+        self.N = N
+        self.skip = skip
+        self.device = device
+
+    def _transform(self, X):
+        # Load past data for aggregation and convert to cupy array
+        hist_data = joblib.load(self.hist_data_path)
+        if self.device == "cpu":
+            data = hist_data["data"]
+        else:
+            data = cp.array(hist_data["data"])
+        hdates = hist_data[self.date_col]
+        _, udim, cdim = *data.shape[:2], len(self.key_cols)
+        # loop over dates and aggregate data for each date
+        dates = X[self.date_col].unique()
+        date_to_idx = {}
+        results = []
+        idx = 0
+        dates_int = np.array([int(self._shift(d)) for d in hdates])
+        indices = np.searchsorted(dates_int, dates, side="right")
+        for i, idx in enumerate(indices):
+            agg = self.agg_date_data(data, idx, udim, cdim)
+            results.append(agg)
+            date_to_idx[dates[i]] = i
+
+        if self.device == "cpu":
+            out = np.stack(results)
+        else:
+            out = cp.stack(results).get()
+
+        # map to input dates, playerIds
+        Xt = []
+        for dt in X[self.date_col].values:
+            Xt.append(out[date_to_idx[dt]])
+        return np.array(Xt)
+
+    def _load_historical_data(self, filepath):
+        data = np.load(str(Path(filepath) / "data.npy")).astype(np.float32)
+        date_mapping = load_json(str(Path(filepath) / "date_mapping.json"))
+        return data, date_mapping
+
+    def agg_date_data(self, data_cp, idx, udim, cdim):
+        if idx == 0:
+            if self.device == "cpu":
+                agg = np.ones(shape=(cdim,), dtype=np.float32) * self.FILL_VALUE
+            else:
+                agg = cp.ones(shape=(cdim,), dtype=np.float32) * self.FILL_VALUE
+
+        else:
+            subdata = data_cp[:idx, :, self.key_cols]
+            try:
+                agg = self._reduce_func(subdata)
+            except IndexError:
+                if self.device == "cpu":
+                    agg = np.ones(shape=(cdim,), dtype=np.float32) * self.FILL_VALUE
+                else:
+                    agg = cp.ones(shape=(cdim,), dtype=np.float32) * self.FILL_VALUE
+
+        return agg
+
+    @abstractmethod
+    def _reduce_func(self, arr):
+        return cp.nansum(arr, axis=(0, 1))
+
+    def _shift(self, date):
+        date = pd.to_datetime(str(date), format="%Y%m%d") + pd.Timedelta(days=self.skip)
+        return f"{date:%Y%m%d}"
+
+
+class DateLagN(DateTransformer):
+    """Expanding max based on historical data."""
+
+    def _reduce_func(self, arr):
+        if self.device == "cpu":
+            return np.nansum(arr[-self.N], axis=0)
+        else:
+            return np.nansum(arr[-self.N], axis=0)

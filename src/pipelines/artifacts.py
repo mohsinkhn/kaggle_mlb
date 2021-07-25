@@ -4,10 +4,11 @@ import shutil
 import joblib
 import numpy as np
 import pandas as pd
+from pandas.core.groupby.groupby import DataError
 from pathlib import Path
 from tqdm import tqdm
 
-from mllib.transformers import BaseTransformer
+from mllib.transformers import BaseTransformer, _convert_to_2d_array
 from src.utils.io import load_json, save_json
 
 
@@ -232,9 +233,13 @@ class GroupByAggDF(DfTransformer):
         self.agg_dict = agg_dict
 
     def _transform(self, X, y=None):
+        X = X.copy()
         try:
+            for col in X.columns:
+                X[col] = pd.to_numeric(X[col], errors='coerce')
             return X.groupby(self.grouper).agg(self.agg_dict).reset_index(drop=False)
-        except (KeyError, AttributeError):
+        except (KeyError, AttributeError, DataError, TypeError) as e:
+            print(f"GroupByAggDF failed! {e}")
             return None
 
 
@@ -393,3 +398,40 @@ class CreateUpdateArtifact(BaseTransformer):
     def _save(self, arr, date_mapping):
         np.save(str(self.artifact_save_path / "data.npy"), arr)
         save_json(date_mapping, str(self.artifact_save_path / "date_mapping.json"))
+
+
+class MapToCol(DfTransformer):
+    def __init__(
+        self,
+        map_col="playerId",
+        attr="playerPositionCode",
+        mapper_input=None,
+        mapper_pipeline=None,
+    ):
+        self.attr = attr
+        self.map_col = map_col
+        self.mapper_pipeline = mapper_pipeline
+        self.mapper_input = mapper_input
+
+    def _transform(self, X, y=None):
+        if (self.map_col not in X.columns):
+            return None
+        data = self.mapper_pipeline.transform(self.mapper_input)
+        try:
+            Xt = X[self.map_col].map(data.groupby(self.map_col)[self.attr].first())
+            return _convert_to_2d_array(Xt)
+        except (KeyError, AttributeError, IndexError) as e:
+            print(e)
+            return None
+
+
+class AddFeature(DfTransformer):
+    def __init__(self, name='teamId', pipe=None):
+        self.pipe = pipe
+        self.name = name
+
+    def _transform(self, X, y=None):
+        X = X.copy()
+        newf = self.pipe.transform(X)
+        X[self.name] = newf
+        return X
