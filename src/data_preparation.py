@@ -20,7 +20,10 @@ from src.constants import (
     AWARDS,
     ROSTERS,
     TRANSACTIONS,
-    AWARDID_DICT
+    AWARDID_DICT,
+    EVENT_COLS,
+    EVENTDESC_MAP,
+    GAME_TYPE_MAP
 )
 from src.constants import (
     playerid_mapping,
@@ -48,7 +51,8 @@ from src.constants import (
     rosters_artifact,
     player_twitter_artifact,
     transactions_artifact,
-    team_standings_artifact
+    team_standings_artifact,
+    event_artifact
 )
 from src.pipelines.artifacts import (
     DataLoader,
@@ -60,6 +64,7 @@ from src.pipelines.artifacts import (
     ParseJsonField,
     MapCol,
     GroupByAggDF,
+    ParseEventField
 )
 
 
@@ -382,6 +387,19 @@ def get_dataprep_pipelines(save_data):
             artifact_name=team_standings_artifact,
         ),
     )
+
+    prepare_events_data = make_pipeline(
+        ParseEventField(data_field="events", use_cols=EVENT_COLS),
+        PivotbyDateUser(
+            user_col="playerId", schema_file=str(Path(save_data) / playerid_mapping)
+        ),
+        Update3DArtifact(
+            user_col="playerId",
+            load_path=str(Path(save_data) / event_artifact),
+            save_path=save_data,
+            artifact_name=event_artifact
+        ),
+    )
     dataprep_pipeline1 = make_union(
         prepare_targets,
         prepare_scores1,
@@ -397,10 +415,10 @@ def get_dataprep_pipelines(save_data):
         prepare_team_scores2_mean,
         prepare_team_scores3_mean,
         prepare_team_standings,
+        prepare_events_data
     )
 
     dataprep_pipeline2 = make_union(
-        prepare_targets,
         prepare_scores1,
         prepare_scores2,
         prepare_scores3,
@@ -414,6 +432,7 @@ def get_dataprep_pipelines(save_data):
         prepare_team_scores2_mean,
         prepare_team_scores3_mean,
         prepare_team_standings,
+        prepare_events_data
     )
     return dataprep_pipeline1, dataprep_pipeline2
 
@@ -421,11 +440,12 @@ def get_dataprep_pipelines(save_data):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--save_data", type=str)
+    parser.add_argument("--train_file", default='train.csv', type=str)
     parser.add_argument("--val_start_date", type=int)
     args = parser.parse_args()
 
     READ_ROOT = "./data"
-    TRAIN_FILE = "./data/train.csv"
+    TRAIN_FILE = f"./data/{args.train_file}"
     VAL_START_DATE = args.val_start_date
     SAVE_DATA = args.save_data
 

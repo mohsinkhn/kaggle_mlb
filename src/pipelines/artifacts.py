@@ -9,6 +9,7 @@ from pathlib import Path
 from tqdm import tqdm
 
 from mllib.transformers import BaseTransformer, _convert_to_2d_array
+from src.constants import GAME_TYPE_MAP
 from src.utils.io import load_json, save_json
 
 
@@ -435,3 +436,82 @@ class AddFeature(DfTransformer):
         newf = self.pipe.transform(X)
         X[self.name] = newf
         return X
+
+
+class ParseEventField(DfTransformer):
+    def __init__(self, date_field="date", data_field=None, use_cols=None):
+        self.date_field = date_field
+        self.data_field = data_field
+        self.use_cols = use_cols
+
+    def _transform(self, X):
+        if (self.data_field not in X.columns) or (self.data_field not in X.columns):
+            return None
+
+        data = []
+        for _, row in tqdm(X.iterrows(), total=len(X)):
+            row_data = row[self.data_field]
+            try:
+                row_df = pd.read_json(row_data)[self.use_cols]
+                final_score_diff = row_df['homeScore'].max() - row_df['awayScore'].max()
+                avg_score_diff = (row_df['homeScore'] - row_df['awayScore']).std()
+                std_score_diff = (row_df['homeScore'] - row_df['awayScore']).mean()
+                num_ump_sub = len(row_df.loc[row_df.event == 'Umpire Substitution'])
+                num_ejection = len(row_df.loc[row_df.event == 'Ejection'])
+                num_injury = len(row_df.loc[row_df.event == 'Injury'])
+
+                try:
+                    a = row_df.groupby('hitterId').agg(
+                        avg_exit_velocity=('launchSpeed', 'mean'),
+                        maxexit_velocity=('launchSpeed', 'max'),
+                        avg_launch_ange=('launchAngle', 'mean'),
+                        max_distance=('totalDistance', 'max'),
+                        game_type=('gameType', 'first')
+
+                    )
+                    a['game_type'] = a['game_type'].map(GAME_TYPE_MAP)
+
+                except Exception:
+                    a = None
+                    print("launhspeed and launchangle stats failed")
+
+                if a is not None:
+                    try:
+                        b = row_df.loc[(row_df.launchAngle > 8) & (row_df.launchAngle < 32)].groupby('hitterId').agg(
+                            sweet_spot_pct=('launchAngle', 'count'),
+                        )
+                        a = pd.merge(a, b, right_index=True, left_index=True)
+                    except Exception:
+                        print("Sweetspot calculation failed")
+                        a['sweet_spot_pct'] = 0
+                a.index.name = 'playerId'
+                a = a.reset_index(drop=False)
+                try:
+                    c = row_df.groupby('pitcherId').agg(
+                        avg_spin_rate=('spinRate', 'mean'),
+                        max_spin_rate=('spinRate', 'max'),
+                        max_start_speed=('startSpeed', 'max'),
+                        avg_spin_direction=('spinDirection', 'mean')
+                    )
+                except Exception:
+                    c = None
+                    print("pitcher stats failed")
+
+                c.index.name = 'playerId'
+                row_df = pd.concat([a, c.reset_index(drop=False)])
+
+            except (ValueError, KeyError):
+                continue
+
+            row_df[self.date_field] = row[self.date_field]
+            row_df['final_score_diff'] = final_score_diff
+            row_df['avg_score_diff'] = avg_score_diff
+            row_df['std_score_diff'] = std_score_diff
+            row_df['num_ejection'] = num_ejection
+            row_df['num_injury'] = num_injury
+            row_df['num_ump_sub'] = num_ump_sub
+            data.append(row_df)
+
+        if len(data) == 0:
+            return None
+        return pd.concat(data)

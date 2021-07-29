@@ -33,6 +33,7 @@ awards_artifact = "train_awards.pkl"
 transactions_artifact = "train_transactions.pkl"
 player_twitter_artifact = "train_pltwitter.pkl"
 rosters_artifact = "train_rosters.pkl"
+event_artifact = "train_events.pkl"
 
 TARGETS = ["target1", "target2", "target3", "target4"]
 SCORES1 = ["home", "jerseyNum", "positionCode", "positionType", "battingOrder"]
@@ -117,7 +118,7 @@ SCORES5 = [
 ]
 AWARDS = ["awardId"]
 ROSTERS = ["statusCode", "teamId"]
-TRANSACTIONS = ["typeCode"]
+TRANSACTIONS = ["typeCode", "toTeamId", "fromTeamId"]
 PLTWITTER = ["numberOfFollowers"]
 
 TEAM_SCORES1 = [
@@ -221,6 +222,99 @@ TEAM_STANDINGS = [
     "nlLosses",
     "xWinLossPct",
 ]
+
+EVENT_COLS = [
+    "gameType",
+    "pitcherTeamId",
+    "pitcherId",
+    "hitterTeamId",
+    "hitterId",
+    "pitcherHand",
+    "batSide",
+    "launchSpeed",
+    "launchAngle",
+    "totalDistance",
+    "startSpeed",
+    "endSpeed",
+    "spinRate",
+    "spinDirection",
+    "event",
+    "inning",
+    "halfInning",
+    "homeScore",
+    "awayScore"
+]
+
+GAME_TYPE_MAP = {
+    'R': 1, 'F': 2, 'D': 3, 'L': 4, 'W': 5
+}
+
+EVENTDESC_MAP = {
+    'Balk': 17,
+    'Injury': 1,
+    'Ejection': 2,
+    'Pickoff 1B': 3,
+    'Runner Out': 4,
+    'Wild Pitch': 5,
+    'Passed Ball': 6,
+    'Defensive Sub': 7,
+    'Game Advisory': 8,
+    'Stolen Base 2B': 9,
+    'Stolen Base 3B': 10,
+    'Pitch Challenge': 11,
+    'Defensive Indiff': 12,
+    'Defensive Switch': 13,
+    'Pickoff Error 1B': 14,
+    'Pitching Substitution': 15,
+    'Offensive Substitution': 16,
+    'None': 0,
+    'Walk': 18,
+    'Double': 19,
+    'Flyout': 20,
+    'Single': 21,
+    'Triple': 22,
+    'Lineout': 23,
+    'Pop Out': 24,
+    'Forceout': 25,
+    'Home Run': 26,
+    'Sac Bunt': 27,
+    'Groundout': 28,
+    'Double Play': 29,
+    'Field Error': 30,
+    'Intent Walk': 31,
+    'Hit By Pitch': 32,
+    'Grounded Into DP': 33,
+    'Caught Stealing 2B': 34,
+    'Sac Fly': 35,
+    'Catcher Interference': 36,
+    'Strikeout': 37,
+    'Fielders Choice Out': 38,
+    'Umpire Substitution': 39,
+    'Bunt Groundout': 40,
+    'Fielders Choice': 41,
+    'Strikeout Double Play': 42,
+    'Stolen Base Home': 43,
+    'Bunt Pop Out': 44,
+    'Pickoff Error 2B': 45,
+    'Batter Interference': 46,
+    'Caught Stealing 3B': 47,
+    'Other Advance': 48,
+    'Pickoff Caught Stealing 2B': 49,
+    'Caught Stealing Home': 50,
+    'Bunt Lineout': 51,
+    'Pickoff 2B': 52,
+    'Error': 53,
+    'Pickoff Caught Stealing Home': 54,
+    'Fan Interference': 55,
+    'Triple Play': 56,
+    'Sac Fly Double Play': 57,
+    'Pickoff 3B': 58,
+    'Pickoff Caught Stealing 3B': 59,
+    'Sac Bunt Double Play': 60,
+    'Pitcher Switch': 61,
+    'Pickoff Error 3B': 62,
+    'Runner Placed On Base': 63
+}
 
 AWARDID_DICT = {
     "MILBORGAS": 1,

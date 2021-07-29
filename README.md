@@ -11,12 +11,21 @@ Kaggle competition repository
 6. 5 + tr_scores - lag1 - 1.465
 7. 4 + lastnsum (2, 7, 30, 90) - 1.456 
 
-#### TODO:
-* prepare tr_index_small  using only players from test set
-* tr_index_medium - 'test' set players + rndonly sampled players
-* tr_index_full
-* artifact generation usng config; feature generation using config
-* training usng config
+#### Final Dash:
+* Improve single model
+    * Add game type, current team standing and opposing team standing
+    * transaction to and from teams
+    * avg velocity, angle and distance
+    * final team1 score, team2 score, std in diff of scores at each innings end
+    * other statcast features
+
+* Rigorous validation
+    * Check score on June, July (Impact of changing windows, cleaning of featuresm hyperparams)
+    * Impact of adding more training data on July validation
+
+* Look out for august specific things
+    * 2019 - July score v/s august score ???
+
 
 
 
