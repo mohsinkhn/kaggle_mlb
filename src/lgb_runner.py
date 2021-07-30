@@ -27,14 +27,26 @@ if __name__ == "__main__":
 
     print(tr_index.shape, vl_index.shape)
 
-    feature_flags = ['2', '3', '31', '32', '33', '4', '41', '5', '6', '7', '8']  # , '3', '4', '5', '6']
+    feature_flags = [
+        "2",
+        "3",
+        "31",
+        "32",
+        "33",
+        "4",
+        "41",
+        "5",
+        "6",
+        "7",
+        "8",
+    ]  # , '3', '4', '5', '6']
     X_tra = np.load("data/features/X_tr1.npy")[:, np.r_[0:8, 16:24]]
     X_vla = np.load("data/features/X_vl1.npy")[:, np.r_[0:8, 16:24]]
     for flag in feature_flags:
         X_tra = np.hstack((X_tra, np.load(f"data/features/X_tr{flag}.npy")))
         X_vla = np.hstack((X_vla, np.load(f"data/features/X_vl{flag}.npy")))
 
-    targets = ['target1', 'target2', 'target3', 'target4']
+    targets = ["target1", "target2", "target3", "target4"]
     y_tr = tr_index[targets].values
     y_vl = vl_index[targets].values
     # print(np.unique(X_tra[:, 235]))
@@ -43,10 +55,26 @@ if __name__ == "__main__":
     tr3 = lgb.Dataset(X_tra, y_tr[:, 2])
     tr4 = lgb.Dataset(X_tra, y_tr[:, 3])
 
-    vl1 = lgb.Dataset(X_vla, y_vl[:, 0], reference=tr1, )
-    vl2 = lgb.Dataset(X_vla, y_vl[:, 1], reference=tr2, )
-    vl3 = lgb.Dataset(X_vla, y_vl[:, 2], reference=tr3, )
-    vl4 = lgb.Dataset(X_vla, y_vl[:, 3], reference=tr4, )
+    vl1 = lgb.Dataset(
+        X_vla,
+        y_vl[:, 0],
+        reference=tr1,
+    )
+    vl2 = lgb.Dataset(
+        X_vla,
+        y_vl[:, 1],
+        reference=tr2,
+    )
+    vl3 = lgb.Dataset(
+        X_vla,
+        y_vl[:, 2],
+        reference=tr3,
+    )
+    vl4 = lgb.Dataset(
+        X_vla,
+        y_vl[:, 3],
+        reference=tr4,
+    )
 
     # params = {
     #     'n_estimators': 4000,
@@ -62,28 +90,28 @@ if __name__ == "__main__":
     # }
 
     params = {
-        'n_estimators': 4000,
-        'learning_rate': 0.05,
-        'num_leaves': 255,
-        'max_depth': -1,
-        'min_data_in_leaf': 5,
-        'colsample_bytree': 0.25,
-        'subsample': 0.95,
-        'bagging_freq': 1,
-        'reg_alpha': 0.1,
-        'reg_lambda': 0.1,
-        'extra_trees': False,
-        'max_bin': 127,
-        'device': 'gpu',
-        'gpu_use_dp': False,
-        'gpu_device_id': 0,
-        'boost_from_average': True,
-        'reg_sqrt': True,
-        'objective': 'mae',
-        'metric': 'mae',
-        'verbose': -1,
-        'seed': 123478659,
-        'num_threads': 16
+        "n_estimators": 4000,
+        "learning_rate": 0.05,
+        "num_leaves": 255,
+        "max_depth": -1,
+        "min_data_in_leaf": 5,
+        "colsample_bytree": 0.25,
+        "subsample": 0.95,
+        "bagging_freq": 1,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "extra_trees": False,
+        "max_bin": 127,
+        "device": "gpu",
+        "gpu_use_dp": False,
+        "gpu_device_id": 0,
+        "boost_from_average": True,
+        "reg_sqrt": True,
+        "objective": "mae",
+        "metric": "mae",
+        "verbose": -1,
+        "seed": 123478659,
+        "num_threads": 16,
     }
     bst1 = lgb.train(params, tr1, valid_sets=[vl1], early_stopping_rounds=200, verbose_eval=50)
     pred1 = bst1.predict(X_vla)

@@ -233,11 +233,11 @@ def get_feature_pipeline1(
         *[
             make_union(
                 *[
-                    LagN(
+                    ExpandingMean(
                         key_cols=cols,
                         hist_data_path=f"{artifacts_path}/{score_artifact}",
-                        fill_value=-1,
-                        N=j + 1,
+                        fill_value=0,
+                        N=j,
                         skip=0,
                         device=device,
                     )
@@ -247,7 +247,6 @@ def get_feature_pipeline1(
             )
             for score_cols, score_artifact in [
                 (scores2_cols, scores2_mean_artifact),
-                (scores3_cols, scores3_mean_artifact),
                 (scores4_cols, scores4_mean_artifact),
             ]
         ]
@@ -257,11 +256,11 @@ def get_feature_pipeline1(
         *[
             make_union(
                 *[
-                    LagN(
+                    ExpandingMean(
                         key_cols=cols,
                         hist_data_path=f"{artifacts_path}/{score_artifact}",
-                        fill_value=-1,
-                        N=j + 1,
+                        fill_value=0,
+                        N=j,
                         skip=0,
                         device=device,
                     )
@@ -279,11 +278,11 @@ def get_feature_pipeline1(
         *[
             make_union(
                 *[
-                    LagN(
+                    ExpandingSum(
                         key_cols=cols,
                         hist_data_path=f"{artifacts_path}/{score_artifact}",
-                        fill_value=-1,
-                        N=j + 1,
+                        fill_value=0,
+                        N=j,
                         skip=0,
                         device=device,
                     )
@@ -303,7 +302,7 @@ def get_feature_pipeline1(
     scores_extra1 = make_union(
         *[
             LagN(
-                key_cols=[0, 1, 4],
+                key_cols=[0, 4],
                 hist_data_path=f"{artifacts_path}/{scores1_mean_artifact}",
                 fill_value=-1,
                 N=j + 1,
