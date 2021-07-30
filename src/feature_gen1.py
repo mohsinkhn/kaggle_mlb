@@ -11,6 +11,7 @@ from mllib.transformers import (
     ExpandingSum,
     FunctionTransfomer,
     LagN,
+    ToFloat32,
 )
 from src.constants import (
     TARGETS,
@@ -325,27 +326,27 @@ def get_feature_pipeline1(
     )
 
     feature_pipeline_tr1 = make_union(
-        target_stats_train1,
-        other_features1,
-        scores_lags1,
-        scores_mean1,
-        scores5_mean1,
-        scores_sum1,
-        scores_extra1,
-        all_players_features,
-        events_features,
+        make_pipeline(target_stats_train1, ToFloat32()),
+        make_pipeline(other_features1, ToFloat32()),
+        make_pipeline(scores_lags1, ToFloat32()),
+        make_pipeline(scores_mean1, ToFloat32()),
+        make_pipeline(scores5_mean1, ToFloat32()),
+        make_pipeline(scores_sum1, ToFloat32()),
+        make_pipeline(scores_extra1, ToFloat32()),
+        make_pipeline(all_players_features, ToFloat32()),
+        make_pipeline(events_features, ToFloat32()),
         verbose=True,
     )
     feature_pipeline_te1 = make_union(
-        target_stats_test1,
-        other_features1,
-        scores_lags1,
-        scores_mean1,
-        scores5_mean1,
-        scores_sum1,
-        scores_extra1,
-        all_players_features,
-        events_features,
+        make_pipeline(target_stats_test1, ToFloat32()),
+        make_pipeline(other_features1, ToFloat32()),
+        make_pipeline(scores_lags1, ToFloat32()),
+        make_pipeline(scores_mean1, ToFloat32()),
+        make_pipeline(scores5_mean1, ToFloat32()),
+        make_pipeline(scores_sum1, ToFloat32()),
+        make_pipeline(scores_extra1, ToFloat32()),
+        make_pipeline(all_players_features, ToFloat32()),
+        make_pipeline(events_features, ToFloat32()),
         verbose=True,
     )
     return feature_pipeline_tr1, feature_pipeline_te1
