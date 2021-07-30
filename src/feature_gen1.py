@@ -1,291 +1,352 @@
-import joblib
+"""Train LGB models."""
+import itertools
 
-import pandas as pd
 import numpy as np
 from sklearn.pipeline import make_pipeline, make_union
-from sklearn.preprocessing import OneHotEncoder
 
 from mllib.transformers import (
+    DateLagN,
+    ExpandingCount,
     ExpandingMean,
-    ExpandingMedian,
-    ExpandingMin,
-    ExpandingMax,
-    ExpandingVar,
-    ExpandingQ05,
-    ExpandingQ25,
-    ExpandingQ75,
-    ExpandingQ95,
     ExpandingSum,
+    FunctionTransfomer,
     LagN,
-    DateTimeFeatures,
-    SelectCols,
-    UnqLastN,
-    LastNSum,
-    LastNMean,
-    MapAttributes,
-    Astype,
-    DateDiff,
 )
-from src.pipelines.artifacts import ParsePlayerData
+from src.constants import (
+    TARGETS,
+    awards_artifact,
+    event_artifact,
+    player_twitter_artifact,
+    rosters_artifact,
+    scores1_mean_artifact,
+    scores2_mean_artifact,
+    scores3_mean_artifact,
+    scores4_mean_artifact,
+    scores5_mean_artifact,
+    targets_artifact,
+    transactions_artifact,
+)
+from src.pipelines.artifacts import DataLoader, MapToCol
+from src.pipelines.utils import batch_list
 
 
-def get_save_features(pipe, tr_index, vl_index, indicator):
-    X_tr = pipe.fit_transform(tr_index)
-    X_vl = pipe.transform(vl_index)
-    np.save(f"data/features/X_tr{indicator}.npy", X_tr)
-    np.save(f"data/features/X_vl{indicator}.npy", X_vl)
-    joblib.dump(pipe, f"data/features/pipe{indicator}.pkl")
+scores1_cols = [0, 1, 2, 3, 4]
+scores2_cols = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+]
+scores3_cols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+scores4_cols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+scores5_cols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+event_cols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 
 
-if __name__ == "__main__":
-    # raw_data = pd.read_csv("data/train.csv")
-    # tr = raw_data.loc[raw_data.date < 20210401]
-    # val = raw_data.loc[raw_data.date >= 20210401]
-    # print(raw_data.shape, val.shape)
+def get_feature_pipeline1(
+    artifacts_path,
+    device="gpu",
+    target_windows=[7, 30, 150, 1500],
+    score_windows=[30, 150],
+    score5_windows=[30, 150],
+):
+    all_players_features = make_union(
+        *[
+            DateLagN(
+                date_col="date",
+                key_cols=cols,
+                hist_data_path=f"{artifacts_path}/{scores2_mean_artifact}",
+                N=j + 1,
+                skip=0,
+                device=device,
+            )
+            for j in range(1)
+            for cols in batch_list(scores2_cols)
+        ],
+        *[
+            DateLagN(
+                date_col="date",
+                key_cols=cols,
+                hist_data_path=f"{artifacts_path}/{scores4_mean_artifact}",
+                N=j + 1,
+                skip=0,
+                device=device,
+            )
+            for j in range(1)
+            for cols in batch_list(scores4_cols)
+        ],
+    )
 
-    # roster_2021 = pd.read_csv("data/players.csv")
-    # roster_2021 = roster_2021.loc[roster_2021.playerForTestSetAndFuturePreds == True]
-    # target_enc = ParsePlayerData("nextDayPlayerEngagement", ["target1", "target2", "target3", "target4"])
-    # tr_index = target_enc.fit_transform(tr).reset_index(drop=False)
-    # vl_index = target_enc.fit_transform(val).reset_index(drop=False)
-    # vl_index = vl_index.loc[vl_index.playerId.isin(roster_2021.playerId.astype(str))]
-    # tr_index.to_csv("data/tr_index.csv", index=False)
-    # vl_index.to_csv("data/vl_index.csv", index=False)
-
-    tr_index = pd.read_csv("data/tr_index.csv")
-    vl_index = pd.read_csv("data/vl_index.csv")
-
-    # features1 = make_union(
-    #     ExpandingMean(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingMedian(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingMax(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingMin(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingQ25(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingQ75(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingQ95(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingQ05(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingMin(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingVar(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, skip=30
-    #     ),
-    #     ExpandingMean(
-    #         "date", "playerId", [0, 1, 2, 3], "data/tr_targets/", "data/playerid_mappings.json", fill_value=-1, N=30, skip=30,
-    #     ), verbose=True
-    # )
-    # get_save_features(features1, tr_index, vl_index, 1)
-    # print("Done features 1")
-
-    # features2 = make_union(
-    #     *[
-    #         LagN(
-    #             "date",
-    #             "playerId",
-    #             [1],
-    #             "data/tr_rosters/",
-    #             "data/playerid_mappings.json",
-    #             fill_value=-1,
-    #             N=i,
-    #             skip=0,
-    #         )
-    #         for i in range(1, 4)
-    #     ],
-    #     *[
-    #         LagN(
-    #             "date",
-    #             "playerId",
-    #             [0],
-    #             "data/tr_rosters/",
-    #             "data/playerid_mappings.json",
-    #             fill_value=-1,
-    #             N=i,
-    #             skip=0,
-    #         )
-    #         for i in range(1, 2)
-    #     ],
-    #     *[
-    #         UnqLastN(
-    #             "date",
-    #             "playerId",
-    #             [1],
-    #             "data/tr_rosters/",
-    #             "data/playerid_mappings.json",
-    #             fill_value=-1,
-    #             N=i,
-    #             skip=0,
-    #         )
-    #         for i in range(2, 5)
-    #     ],
-    #     verbose=True,
-    # )
-    # get_save_features(features2, tr_index, vl_index, 2)
-    # print("Done features 2")
-
-    # features3 = make_union(
-    #     *[
-    #         LagN(
-    #             "date",
-    #             "playerId",
-    #             list(range(4 * i, 4 * (i + 1))),
-    #             "data/tr_scores_mean/",
-    #             "data/playerid_mappings.json",
-    #             fill_value=-1,
-    #             N=j,
-    #         )
-    #         for i in range(17)
-    #         for j in range(1, 3)
-    #     ], verbose=True
-    # )
-    # get_save_features(features3, tr_index, vl_index, 3)
-    # print("Done features 3")
-
-    # features31 = make_union(
-    #     *[
-    #         LagN(
-    #             "date",
-    #             "playerId",
-    #             list(range(4 * i, 4 * (i + 1))),
-    #             "data/tr_scores_max/",
-    #             "data/playerid_mappings.json",
-    #             fill_value=-1,
-    #             N=j,
-    #         )
-    #         for i in range(17)
-    #         for j in range(1, 3)
-    #     ], verbose=True
-    # )
-    # get_save_features(features31, tr_index, vl_index, 31)
-    # print("Done features 31")
-
-    # features32 = make_union(
-    #     *[
-    #         LagN(
-    #             "date",
-    #             "playerId",
-    #             list(range(4 * i, 4 * (i + 1))),
-    #             "data/tr_scores_sum/",
-    #             "data/playerid_mappings.json",
-    #             fill_value=-1,
-    #             N=j,
-    #         )
-    #         for i in range(17)
-    #         for j in range(1, 3)
-    #     ], verbose=True
-    # )
-    # get_save_features(features32, tr_index, vl_index, 32)
-    # print("Done features 32")
-
-    # features33 = make_union(
-    #     *[
-    #         LastNMean(
-    #             "date",
-    #             "playerId",
-    #             list(range(4 * i, 4 * (i + 1))),
-    #             "data/tr_scores_mean/",
-    #             "data/playerid_mappings.json",
-    #             fill_value=-1,
-    #             N=j,
-    #         )
-    #         for i in range(17)
-    #         for j in [7, 30]
-    #     ], verbose=True
-    # )
-    # get_save_features(features33, tr_index, vl_index, 33)
-    # print("Done features 32")
-
-    # features34 = make_union(
-    #     *[
-    #         LastNSum(
-    #             "date",
-    #             "playerId",
-    #             list(range(4 * i, 4 * (i + 1))),
-    #             "data/tr_scores_sum/",
-    #             "data/playerid_mappings.json",
-    #             fill_value=-1,
-    #             N=j,
-    #         )
-    #         for i in range(17)
-    #         for j in [7, 30]
-    #     ], verbose=True
-    # )
-    # get_save_features(features34, tr_index, vl_index, 34)
-    # print("Done features 34")
-
-
-    # features4 = make_union(
-    #     make_pipeline(
-    #         MapAttributes('data/players.csv', 'csv', 'playerId', 'primaryPositionCode'),
-    #         Astype('int32', {'O': 11, 'I': 12})
-    #     ),
-    #     MapAttributes('data/players.csv', 'csv', 'playerId', 'weight'),
-    #     MapAttributes('data/players.csv', 'csv', 'playerId', 'heightInches'),
-    # )
-    # get_save_features(features4, tr_index, vl_index, 4)
-
-    # features41 = DateDiff(date_col='date', user_col='playerId', diff_col='mlbDebutDate', data_filepath='data/players.csv', format='%Y%m%d')
-    # get_save_features(features41, tr_index, vl_index, 41)
-
-    # features5 = make_union(
-    #     make_pipeline(
-    #         LastNSum("date", "playerId", [0], "data/tr_awards/", "data/playerid_mappings.json", fill_value=-1, N=1000),
-    #     ), verbose=True
-    # )
-    # get_save_features(features5, tr_index, vl_index, 5)
-    # print("Done features 5")
-
-    # features6 = make_union(
-    #     LagN(
-    #         "date",
-    #         "playerId",
-    #         [0],
-    #         "data/tr_transactions/",
-    #         "data/playerid_mappings.json",
-    #         fill_value=-1,
-    #         N=1,
-    #     ),
-    #     verbose=True,
-    # )
-    # get_save_features(features6, tr_index, vl_index, 6)
-    # print("Done features 6")
-
-    # features7 = make_union(
-    #     MapAttributes('data/seasons_formatted.csv', 'csv', 'date', 'seasonflag'),
-    #     DateDiff('date', 'date', 'season_start', 'data/seasons_formatted.csv'),
-    #     DateDiff('date', 'date', 'season_end', 'data/seasons_formatted.csv'),
-    #     DateDiff('date', 'date', 'all_star', 'data/seasons_formatted.csv'),
-    #     verbose=True
-    # )
-    # get_save_features(features7, tr_index, vl_index, 7)
-    # print("Done features 7")
-
-    features8 = make_union(
-        LagN(
-            "date",
-            "playerId",
-            [0],
-            "data/tr_twitter/",
-            "data/playerid_mappings.json",
-            fill_value=-1,
-            N=1,
+    events_features = make_union(
+        *[
+            LagN(
+                key_cols=cols,
+                hist_data_path=f"{artifacts_path}/{event_artifact}",
+                fill_value=0,
+                N=j + 1,
+                skip=0,
+                device=device,
+            )
+            for j in range(2)
+            for cols in batch_list(event_cols)
+        ],
+        MapToCol(
+            map_col="date",
+            attr="seasonflag",
+            mapper_input="seasons_formatted.csv",
+            mapper_pipeline=DataLoader(artifacts_path, ftype="csv"),
         ),
+    )
+    target_stats_train1 = make_union(
+        *[
+            ExpandingMean(
+                key_cols=[0, 1, 2, 3],
+                hist_data_path=f"{artifacts_path}/{targets_artifact}",
+                N=j,
+                skip=10,
+                device=device,
+                fill_value=0,
+            )
+            for j in target_windows
+        ],
+    )
+
+    target_stats_test1 = make_union(
+        *[
+            ExpandingMean(
+                key_cols=[0, 1, 2, 3],
+                hist_data_path=f"{artifacts_path}/{targets_artifact}",
+                N=j,
+                skip=0,
+                device=device,
+                fill_value=0,
+            )
+            for j in target_windows
+        ],
         verbose=True,
     )
-    get_save_features(features8, tr_index, vl_index, 8)
-    print("Done features 8")
+
+    other_features1 = make_union(
+        LagN(
+            key_cols=[0],
+            hist_data_path=f"{artifacts_path}/{awards_artifact}",
+            fill_value=-1,
+            N=1,
+            skip=0,
+            device=device,
+        ),
+        ExpandingCount(
+            key_cols=[0],
+            hist_data_path=f"{artifacts_path}/{awards_artifact}",
+            fill_value=0,
+            N=365,
+            skip=0,
+            device=device,
+        ),
+        LagN(
+            key_cols=[0, 1, 2],
+            hist_data_path=f"{artifacts_path}/{transactions_artifact}",
+            fill_value=-1,
+            N=1,
+            skip=0,
+            device=device,
+        ),
+        LagN(
+            key_cols=[0],
+            hist_data_path=f"{artifacts_path}/{rosters_artifact}",
+            fill_value=-1,
+            N=1,
+            skip=0,
+            device=device,
+        ),
+        *[
+            ExpandingCount(
+                key_cols=[0],
+                hist_data_path=f"{artifacts_path}/{rosters_artifact}",
+                fill_value=0,
+                N=j,
+                skip=0,
+                device=device,
+            )
+            for j in score_windows
+        ],
+        make_pipeline(
+            LagN(
+                key_cols=[0],
+                hist_data_path=f"{artifacts_path}/{player_twitter_artifact}",
+                fill_value=0,
+                N=1,
+                skip=0,
+                device=device,
+            ),
+            FunctionTransfomer(np.log1p),
+        ),
+    )
+
+    scores_lags1 = make_union(
+        *[
+            make_union(
+                *[
+                    LagN(
+                        key_cols=cols,
+                        hist_data_path=f"{artifacts_path}/{score_artifact}",
+                        fill_value=-1,
+                        N=j + 1,
+                        skip=0,
+                        device=device,
+                    )
+                    for j in range(2)
+                    for cols in batch_list(score_cols, 4)
+                ]
+            )
+            for score_cols, score_artifact in [
+                (scores1_cols, scores1_mean_artifact),
+                (scores2_cols, scores2_mean_artifact),
+                (scores3_cols, scores3_mean_artifact),
+                (scores4_cols, scores4_mean_artifact),
+                (scores5_cols, scores5_mean_artifact),
+            ]
+        ]
+    )
+
+    scores_mean1 = make_union(
+        *[
+            make_union(
+                *[
+                    LagN(
+                        key_cols=cols,
+                        hist_data_path=f"{artifacts_path}/{score_artifact}",
+                        fill_value=-1,
+                        N=j + 1,
+                        skip=0,
+                        device=device,
+                    )
+                    for j in score_windows
+                    for cols in batch_list(score_cols, 4)
+                ]
+            )
+            for score_cols, score_artifact in [
+                (scores2_cols, scores2_mean_artifact),
+                (scores3_cols, scores3_mean_artifact),
+                (scores4_cols, scores4_mean_artifact),
+            ]
+        ]
+    )
+
+    scores5_mean1 = make_union(
+        *[
+            make_union(
+                *[
+                    LagN(
+                        key_cols=cols,
+                        hist_data_path=f"{artifacts_path}/{score_artifact}",
+                        fill_value=-1,
+                        N=j + 1,
+                        skip=0,
+                        device=device,
+                    )
+                    for j in score5_windows
+                    for cols in batch_list(score_cols, 4)
+                ]
+            )
+            for score_cols, score_artifact in [
+                (scores5_cols, scores5_mean_artifact),
+            ]
+        ]
+    )
+
+    scores_sum1 = make_union(
+        *[
+            make_union(
+                *[
+                    LagN(
+                        key_cols=cols,
+                        hist_data_path=f"{artifacts_path}/{score_artifact}",
+                        fill_value=-1,
+                        N=j + 1,
+                        skip=0,
+                        device=device,
+                    )
+                    for j in score_windows
+                    for cols in batch_list(score_cols, 4)
+                ]
+            )
+            for score_cols, score_artifact in [
+                (scores2_cols, scores2_mean_artifact),
+                (scores3_cols, scores3_mean_artifact),
+                (scores4_cols, scores4_mean_artifact),
+                (scores5_cols, scores5_mean_artifact),
+            ]
+        ]
+    )
+
+    scores_extra1 = make_union(
+        *[
+            LagN(
+                key_cols=[0, 1, 4],
+                hist_data_path=f"{artifacts_path}/{scores1_mean_artifact}",
+                fill_value=-1,
+                N=j + 1,
+                skip=0,
+                device=device,
+            )
+            for j in range(2, 14)
+        ],
+        *[
+            ExpandingCount(
+                key_cols=[0],
+                hist_data_path=f"{artifacts_path}/{scores1_mean_artifact}",
+                fill_value=0,
+                N=j,
+                skip=0,
+                device=device,
+            )
+            for j in score5_windows
+        ],
+    )
+
+    feature_pipeline_tr1 = make_union(
+        target_stats_train1,
+        other_features1,
+        scores_lags1,
+        scores_mean1,
+        scores5_mean1,
+        scores_sum1,
+        scores_extra1,
+        all_players_features,
+        events_features,
+        verbose=True,
+    )
+    feature_pipeline_te1 = make_union(
+        target_stats_test1,
+        other_features1,
+        scores_lags1,
+        scores_mean1,
+        scores5_mean1,
+        scores_sum1,
+        scores_extra1,
+        all_players_features,
+        events_features,
+        verbose=True,
+    )
+    return feature_pipeline_tr1, feature_pipeline_te1

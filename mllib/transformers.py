@@ -75,8 +75,8 @@ class TimeSeriesTransformer(ArrayTransformer):
 
     def __init__(
         self,
-        date_col='date',
-        user_col='playerId',
+        date_col="date",
+        user_col="playerId",
         key_cols=None,
         hist_data_path=None,
         fill_value=np.nan,
@@ -90,7 +90,7 @@ class TimeSeriesTransformer(ArrayTransformer):
         self.key_cols = key_cols
         self.hist_data_path = hist_data_path
         self.cols = [self.date_col, self.user_col]
-        self.FILL_VALUE = fill_value
+        self.fill_value = fill_value
         self.N = N
         self.skip = skip
         self.device = device
@@ -129,15 +129,15 @@ class TimeSeriesTransformer(ArrayTransformer):
             if pid in player_mapping:
                 Xt.append(out[date_to_idx[dt], player_mapping[pid]])
             else:
-                Xt.append(np.ones(shape=(out.shape[2],)) * self.FILL_VALUE)
+                Xt.append(np.ones(shape=(out.shape[2],)) * self.fill_value)
         return np.array(Xt)
 
     def agg_date_data(self, data_cp, idx, udim, cdim):
         if idx == 0:
             if self.device == "cpu":
-                agg = np.ones(shape=(udim, cdim), dtype=np.float32) * self.FILL_VALUE
+                agg = np.ones(shape=(udim, cdim), dtype=np.float32) * self.fill_value
             else:
-                agg = cp.ones(shape=(udim, cdim), dtype=np.float32) * self.FILL_VALUE
+                agg = cp.ones(shape=(udim, cdim), dtype=np.float32) * self.fill_value
 
         else:
             subdata = data_cp[:idx, :, :]
@@ -158,9 +158,9 @@ class ExpandingMax(TimeSeriesTransformer):
 
     def _reduce_func(self, arr):
         if self.device == "cpu":
-            return np.nanmax(arr[-self.N :], axis=0)
+            return np.nanmax(arr[-self.N:], axis=0)
         else:
-            return cp.nanmax(arr[-self.N :], axis=0)
+            return cp.nanmax(arr[-self.N:], axis=0)
 
 
 class ExpandingSum(TimeSeriesTransformer):
@@ -168,9 +168,9 @@ class ExpandingSum(TimeSeriesTransformer):
 
     def _reduce_func(self, arr):
         if self.device == "cpu":
-            return np.nansum(arr[-self.N :], axis=0)
+            return np.nansum(arr[-self.N:], axis=0)
         else:
-            return cp.nansum(arr[-self.N :], axis=0)
+            return cp.nansum(arr[-self.N:], axis=0)
 
 
 class ExpandingCount(TimeSeriesTransformer):
@@ -178,23 +178,23 @@ class ExpandingCount(TimeSeriesTransformer):
 
     def _reduce_func(self, arr):
         if self.device == "cpu":
-            return np.count_nonzero(~np.isnan(arr[-self.N :]), axis=0)
+            return np.count_nonzero(~np.isnan(arr[-self.N:]), axis=0)
         else:
-            return cp.count_nonzero(~np.isnan(arr[-self.N :]), axis=0)
+            return cp.count_nonzero(~np.isnan(arr[-self.N:]), axis=0)
 
 
 class ExpandingVar(TimeSeriesTransformer):
     """Expanding max based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.nanvar(arr[-self.N :], axis=0)
+        return cp.nanvar(arr[-self.N:], axis=0)
 
 
 class ExpandingMin(TimeSeriesTransformer):
     """Expanding max based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.nanmin(arr[-self.N :], axis=0)
+        return cp.nanmin(arr[-self.N:], axis=0)
 
 
 class ExpandingMean(TimeSeriesTransformer):
@@ -202,9 +202,9 @@ class ExpandingMean(TimeSeriesTransformer):
 
     def _reduce_func(self, arr):
         if self.device == "cpu":
-            return np.nanmean(arr[-self.N :], axis=0)
+            return np.nanmean(arr[-self.N:], axis=0)
         else:
-            return cp.nanmean(arr[-self.N :], axis=0)
+            return cp.nanmean(arr[-self.N:], axis=0)
 
 
 class ExpandingMedian(TimeSeriesTransformer):
@@ -212,37 +212,37 @@ class ExpandingMedian(TimeSeriesTransformer):
 
     def _reduce_func(self, arr):
         if self.device == "cpu":
-            return np.nanmedian(arr[-self.N :], axis=0)
+            return np.nanmedian(arr[-self.N:], axis=0)
         else:
-            return cp.nanmedian(arr[-self.N :], axis=0)
+            return cp.nanmedian(arr[-self.N:], axis=0)
 
 
 class ExpandingQ05(TimeSeriesTransformer):
     """Expanding 5th percentile based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.quantile(arr[-self.N :], 0.05, axis=0)
+        return cp.quantile(arr[-self.N:], 0.05, axis=0)
 
 
 class ExpandingQ25(TimeSeriesTransformer):
     """Expanding 25th percentile based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.quantile(arr[-self.N :], 0.25, axis=0)
+        return cp.quantile(arr[-self.N:], 0.25, axis=0)
 
 
 class ExpandingQ75(TimeSeriesTransformer):
     """Expanding 75th percentile based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.quantile(arr[-self.N :], 0.75, axis=0)
+        return cp.quantile(arr[-self.N:], 0.75, axis=0)
 
 
 class ExpandingQ95(TimeSeriesTransformer):
     """Expanding 95th percentile based on historical data."""
 
     def _reduce_func(self, arr):
-        return cp.quantile(arr[-self.N :], 0.95, axis=0)
+        return cp.quantile(arr[-self.N:], 0.95, axis=0)
 
 
 class LagN(TimeSeriesTransformer):
@@ -253,9 +253,9 @@ class LagN(TimeSeriesTransformer):
             return arr[0]
         subarr = arr[-self.N]
         if self.device == "cpu":
-            subarr[np.isnan(subarr)] = self.FILL_VALUE
+            subarr[np.isnan(subarr)] = self.fill_value
         else:
-            subarr[cp.isnan(subarr)] = self.FILL_VALUE
+            subarr[cp.isnan(subarr)] = self.fill_value
         return subarr
 
 
@@ -265,10 +265,10 @@ class UnqLastN(TimeSeriesTransformer):
     def _reduce_func(self, arr):
         if len(arr) < self.N:
             return arr[0]
-        subarr = arr[-self.N :]
-        subarr[cp.isnan(subarr)] = self.FILL_VALUE
+        subarr = arr[-self.N:]
+        subarr[cp.isnan(subarr)] = self.fill_value
         subarr = cp.sum(subarr[1:] != subarr[:-1], 0)
-        # subarr[cp.isnan(subarr)] = self.FILL_VALUE
+        # subarr[cp.isnan(subarr)] = self.fill_value
         return subarr
 
 
@@ -278,7 +278,7 @@ class LastNMean(TimeSeriesTransformer):
     def _reduce_func(self, arr):
         if len(arr) < self.N:
             return arr[0]
-        subarr = arr[-self.N :]
+        subarr = arr[-self.N:]
         return cp.nanmean(subarr, 0)
 
 
@@ -288,7 +288,7 @@ class LastNMedian(TimeSeriesTransformer):
     def _reduce_func(self, arr):
         if len(arr) < self.N:
             return arr[0]
-        subarr = arr[-self.N :]
+        subarr = arr[-self.N:]
         return cp.nanmean(subarr, 0)
 
 
@@ -298,7 +298,7 @@ class LastNSum(TimeSeriesTransformer):
     def _reduce_func(self, arr):
         if len(arr) < self.N:
             return arr[0]
-        subarr = arr[-self.N :]
+        subarr = arr[-self.N:]
         return cp.nansum(subarr, 0)
 
 
@@ -414,7 +414,7 @@ class DateTransformer(ArrayTransformer):
         self.key_cols = key_cols
         self.hist_data_path = hist_data_path
         # self.player_mapping = load_json(player_mapping)
-        self.FILL_VALUE = fill_value
+        self.fill_value = fill_value
         self.N = N
         self.skip = skip
         self.device = device
@@ -459,9 +459,9 @@ class DateTransformer(ArrayTransformer):
     def agg_date_data(self, data_cp, idx, udim, cdim):
         if idx == 0:
             if self.device == "cpu":
-                agg = np.ones(shape=(cdim,), dtype=np.float32) * self.FILL_VALUE
+                agg = np.ones(shape=(cdim,), dtype=np.float32) * self.fill_value
             else:
-                agg = cp.ones(shape=(cdim,), dtype=np.float32) * self.FILL_VALUE
+                agg = cp.ones(shape=(cdim,), dtype=np.float32) * self.fill_value
 
         else:
             subdata = data_cp[:idx, :, self.key_cols]
@@ -469,9 +469,9 @@ class DateTransformer(ArrayTransformer):
                 agg = self._reduce_func(subdata)
             except IndexError:
                 if self.device == "cpu":
-                    agg = np.ones(shape=(cdim,), dtype=np.float32) * self.FILL_VALUE
+                    agg = np.ones(shape=(cdim,), dtype=np.float32) * self.fill_value
                 else:
-                    agg = cp.ones(shape=(cdim,), dtype=np.float32) * self.FILL_VALUE
+                    agg = cp.ones(shape=(cdim,), dtype=np.float32) * self.fill_value
 
         return agg
 
