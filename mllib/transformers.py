@@ -349,6 +349,14 @@ class DateTimeFeatures(ArrayTransformer):
         return np.vstack(Xt).T
 
 
+class ToFloat32(ArrayTransformer):
+    def __init__(self, dtype=None):
+        self.dtype = dtype
+
+    def _transform(self, X, y=None):
+        return X.astype(np.float32)
+
+
 class Astype(ArrayTransformer):
     def __init__(self, totype="int32", values_to_map=None):
         self.totype = totype
