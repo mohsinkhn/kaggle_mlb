@@ -1,5 +1,6 @@
 import json
 import shutil
+import warnings
 
 import joblib
 import numpy as np
@@ -11,6 +12,8 @@ from tqdm import tqdm
 from mllib.transformers import BaseTransformer, _convert_to_2d_array
 from src.constants import GAME_TYPE_MAP
 from src.utils.io import load_json, save_json
+
+warnings.filterwarnings('ignore')
 
 
 def save_data(data, save_path, artifact_name, save_type):
@@ -140,9 +143,7 @@ class Update3DArtifact(BaseTransformer):
         curr_users_idx = np.array([user_idx_map[u] for u in curr_users if u in user_idx_map])
         valid_users_idx = np.array([i for i, u in enumerate(curr_users) if u in user_idx_map])
 
-        print("Loaded data ...")
-
-        for i, date in tqdm(enumerate(curr_dates)):
+        for i, date in enumerate(curr_dates):
             if date in date_idx_map:
                 prev_arr[date_idx_map[date], curr_users_idx] = curr_arr[i, valid_users_idx]
             else:
@@ -155,7 +156,7 @@ class Update3DArtifact(BaseTransformer):
                 dates.append(date)
 
         data = {"data": prev_arr, self.date_col: dates, self.user_col: users}
-        print("Updating data, Saving ...")
+        print(f"Updated {self.artifact_name}")
         save_data(data, self.save_path, self.artifact_name, self.save_type)
         return True
 
@@ -222,11 +223,12 @@ class ParseJsonField(DfTransformer):
         self.use_cols = use_cols
 
     def _transform(self, X):
+        print(f"Parsing {self.data_field}")
         if (self.data_field not in X.columns) or (self.data_field not in X.columns):
             return None
 
         data = []
-        for _, row in tqdm(X.iterrows(), total=len(X)):
+        for _, row in X.iterrows():
             row_data = row[self.data_field]
             try:
                 row_df = pd.read_json(row_data)[self.use_cols]
@@ -309,7 +311,7 @@ class PivotbyDateUser(DfTransformer):
             np.ones(shape=(len(unq_dates), len(schema_users), len(feature_cols)), dtype=self.dtype)
             * self.fill_value
         )
-        for i, date in tqdm(enumerate(unq_dates), total=len(unq_dates)):
+        for i, date in enumerate(unq_dates):
             try:
                 arr[i, user_indices[indices == i], :] = features_casted[indices == i]
             except TypeError:
@@ -479,7 +481,7 @@ class ParseEventField(DfTransformer):
             return None
 
         data = []
-        for _, row in tqdm(X.iterrows(), total=len(X)):
+        for _, row in X.iterrows():
             row_data = row[self.data_field]
             try:
                 row_df = pd.read_json(row_data)[self.use_cols]
