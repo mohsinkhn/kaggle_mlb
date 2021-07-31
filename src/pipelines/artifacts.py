@@ -123,42 +123,46 @@ class Update3DArtifact(BaseTransformer):
         if data is None:
             return None
 
-        curr_arr, curr_dates, curr_users = data["data"], data[self.date_col], data[self.user_col]
+        try:
+            curr_arr, curr_dates, curr_users = data["data"], data[self.date_col], data[self.user_col]
 
-        if (self.load_path is not None) and Path(self.load_path).exists():
-            artifact = load_data(self.load_path, self.save_type)
-            prev_arr, dates, users = (
-                artifact["data"],
-                artifact[self.date_col],
-                artifact[self.user_col],
-            )
-            date_idx_map = {d: i for i, d in enumerate(dates)}
-            user_idx_map = {u: i for i, u in enumerate(users)}
-        else:
-            date_idx_map = {}
-            prev_arr, dates = [], []
-            users = curr_users[:]
-            user_idx_map = {u: i for i, u in enumerate(curr_users)}
-
-        curr_users_idx = np.array([user_idx_map[u] for u in curr_users if u in user_idx_map])
-        valid_users_idx = np.array([i for i, u in enumerate(curr_users) if u in user_idx_map])
-
-        for i, date in enumerate(curr_dates):
-            if date in date_idx_map:
-                prev_arr[date_idx_map[date], curr_users_idx] = curr_arr[i, valid_users_idx]
+            if (self.load_path is not None) and Path(self.load_path).exists():
+                artifact = load_data(self.load_path, self.save_type)
+                prev_arr, dates, users = (
+                    artifact["data"],
+                    artifact[self.date_col],
+                    artifact[self.user_col],
+                )
+                date_idx_map = {d: i for i, d in enumerate(dates)}
+                user_idx_map = {u: i for i, u in enumerate(users)}
             else:
-                if len(prev_arr) > 0:
-                    prev_arr = np.vstack(
-                        (prev_arr, np.expand_dims(curr_arr[i, curr_users_idx], 0))
-                    )
-                else:
-                    prev_arr = np.expand_dims(curr_arr[i, curr_users_idx], 0)
-                dates.append(date)
+                date_idx_map = {}
+                prev_arr, dates = [], []
+                users = curr_users[:]
+                user_idx_map = {u: i for i, u in enumerate(curr_users)}
 
-        data = {"data": prev_arr, self.date_col: dates, self.user_col: users}
-        print(f"Updated {self.artifact_name}")
-        save_data(data, self.save_path, self.artifact_name, self.save_type)
-        return True
+            curr_users_idx = np.array([user_idx_map[u] for u in curr_users if u in user_idx_map])
+            valid_users_idx = np.array([i for i, u in enumerate(curr_users) if u in user_idx_map])
+
+            for i, date in enumerate(curr_dates):
+                if date in date_idx_map:
+                    prev_arr[date_idx_map[date], curr_users_idx] = curr_arr[i, valid_users_idx]
+                else:
+                    if len(prev_arr) > 0:
+                        prev_arr = np.vstack(
+                            (prev_arr, np.expand_dims(curr_arr[i, curr_users_idx], 0))
+                        )
+                    else:
+                        prev_arr = np.expand_dims(curr_arr[i, curr_users_idx], 0)
+                    dates.append(date)
+
+            data = {"data": prev_arr, self.date_col: dates, self.user_col: users}
+            print(f"Updated {self.artifact_name}")
+            save_data(data, self.save_path, self.artifact_name, self.save_type)
+            return True
+        except Exception:
+            print("update 3D failed")
+            return False
 
 
 class DfTransformer(BaseTransformer):
@@ -479,7 +483,7 @@ class ParseEventField(DfTransformer):
     def _transform(self, X):
         if (self.data_field not in X.columns) or (self.data_field not in X.columns):
             return None
-
+        
         data = []
         for _, row in X.iterrows():
             row_data = row[self.data_field]
