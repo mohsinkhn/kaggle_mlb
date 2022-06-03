@@ -1,6 +1,8 @@
 # kaggle_mlb
-Kaggle competition repository
+[Kaggle competition repository
+](https://www.kaggle.com/c/mlb-player-digital-engagement-forecasting)
 
+### 4th place solution
 
 #### OLD
 1. Expanding Mean, Median, Median(365 days) - 1.614
