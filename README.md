@@ -1,3 +1,6 @@
+[![Mohsin's GitHub stats](https://github-readme-stats.vercel.app/api?username=mohsinkhn)](https://github.com/anuraghazra/github-readme-stats)
+
+
 # kaggle_mlb
 [Kaggle competition repository
 ](https://www.kaggle.com/c/mlb-player-digital-engagement-forecasting)
